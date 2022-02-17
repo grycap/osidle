@@ -190,21 +190,21 @@ if __name__ == "__main__":
         f_evaluation = [ *f_evaluation, "cpu.score" ]
         h_evaluation = [ *h_evaluation, "P. CPU" ]
         f_data = [ *f_data, "cpu.data" ]
-        h_data = [ *h_data, "cpu usage", *([""]*9) ]
+        h_data = [ *h_data, "cpu 0-10", "cpu 10-20", "cpu 20-30", "cpu 30-40", "cpu 40-50", "cpu 50-60", "cpu 60-70", "cpu 70-80", "cpu 80-90", "cpu 90-100" ]
     if args.analysis_disk:
         f_stats = [ *f_stats, "stats.disk.min", "stats.disk.max", "stats.disk.mean", "stats.disk.median" ]
         h_stats = [ *h_stats, "Disk min", "Disk max", "Disk mean", "Disk median" ]
         f_evaluation = [ *f_evaluation, "disk.score" ]
         h_evaluation = [ *h_evaluation, "P. disk" ]
         f_data = [ *f_data, "disk.data" ]
-        h_data = [ *h_data, "disk usage", *([""]*9) ]
+        h_data = [ *h_data, "disk 0-10", "disk 10-20", "disk 20-30", "disk 30-40", "disk 40-50", "disk 50-60", "disk 60-70", "disk 70-80", "disk 80-90", "disk 90-100" ]
     if args.analysis_nic:
         f_stats = [ *f_stats, "stats.nic.min", "stats.nic.max", "stats.nic.mean", "stats.nic.median" ]
         h_stats = [ *h_stats, "NIC min", "NIC max", "NIC mean", "NIC median" ]
         f_evaluation = [ *f_evaluation, "nic.score" ]
         h_evaluation = [ *h_evaluation, "P. score" ]
         f_data = [ *f_data, "nic.data" ]
-        h_data = [ *h_data, "nic usage", *([""]*9) ]
+        h_data = [ *h_data, "nic 0-10", "nic 10-20", "nic 20-30", "nic 30-40", "nic 40-50", "nic 50-60", "nic 60-70", "nic 70-80", "nic 80-90", "nic 90-100" ]
 
     # Now get the analysis
     for vm, data in rawdata.items():
