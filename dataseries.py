@@ -46,7 +46,10 @@ def basicstats(_data, tpos = 0, vpos = 1):
 
     deviation = math.sqrt(sum([ (x[1] - meanval)**2 for x in values ]) / (count - 1))
 
-    pct_deviation = deviation / (values[-1][1] - values[0][1])
+    if values[-1][1] == values[0][1]:
+        pct_deviation = 0
+    else:
+        pct_deviation = deviation / (values[-1][1] - values[0][1])
 
     return {
         "min": values[0][1],

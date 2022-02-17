@@ -70,10 +70,13 @@ if __name__ == "__main__":
     parser.add_argument("-U", "--under-threshold", dest="threshold_summarize", help="summary will show only VMs under this threshold of puntuation (from 0 to 10)", type=int, default=3)
     parser.add_argument("-o", "--sort", dest="sort", help="Sort the output descending by estimated usage of the VM", action="store_true", default=False)
     parser.add_argument("-i", "--vm-id", dest="vmids", action="append", help="id of the VMs to be analyzed (can appear multiple times)", type=str)
-    parser.add_argument("-v", "--verbose", dest="verbose", help="verbose mode", action="store_true", default=False)
+    parser.add_argument("-v", "--verbose", dest="verbose", help="verbose", action="store_true", default=False)
+    parser.add_argument("-vv", "--verbose-more", dest="verbosemore", help="verbose more", action="store_true", default=False)
     parser.add_argument("--include-eval-data", dest="include_eval_data", action="store_true", default=False, help="include data used for evaluation")
     parser.add_argument("--include-stats", dest="include_stats", help="include the stats in the output", action="store_true", default=False)
     parser.add_argument("--dump-data", dest="dumpdata", action="store_true", default=False, help="dump the data that would be used for the analysis and finalizes")
+    parser.add_argument("--info", dest="info", action="store_true", default=False, help="get the information about the data available and exit")
+    parser.add_argument("--vmlist", dest="vmlist", action="store_true", default=False, help="if getting information, dump the list of available VMs")
 
     try:
         args = parser.parse_args()
@@ -84,7 +87,9 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if args.verbose:
-        setVerbose()
+        setVerbose(1)
+    if args.verbosemore:
+        setVerbose(2)
 
     # Connect to the database (if possible)
     storage = Storage(args.database)
@@ -96,6 +101,16 @@ if __name__ == "__main__":
 
     # Correct the arguments using the keywords and special values
     args = correctArguments(args, beginTime, endTime)
+
+    # Get information
+    if args.info:
+        print("Information about the data available:")
+        print("  - first entry:", beginTime)
+        print("  - last entry:", endTime)
+        print("  - available vms:", len(storage.getvms()))
+        if args.vmlist:
+            print("  - available vm ids:", "\n      ".join(["", *storage.getvms()]))
+        sys.exit(0)
 
     # Now the default options for each of the specific VM is the options passed in the commandline
     parser.set_defaults(**args.__dict__)

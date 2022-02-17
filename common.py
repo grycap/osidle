@@ -17,7 +17,7 @@ import re
 
 __verbose = False
 
-def setVerbose(set = True):
+def setVerbose(set = 1):
     global __verbose
     __verbose = set
 
@@ -32,12 +32,14 @@ def NOW():
     return __now
 
 def p_debug(*args):
-    for x in args:
-        msg = "[DEBUG - {}] {}".format(datetime.now(), x)
-        print(msg)
+    global __verbose
+    if __verbose > 0:
+        for x in args:
+            msg = "[DEBUG - {}] {}".format(datetime.now(), x)
+            print(msg)
 def p_debugv(*args):
     global __verbose
-    if __verbose:
+    if __verbose > 1:
         p_debug(*args)
 def p_error(x):
     msg = "[ERROR - {}] {}".format(datetime.now(), x)
