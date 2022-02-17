@@ -155,7 +155,9 @@ if __name__ == "__main__":
     # Obtain the stats for the different VMs
     rawdata = {}
     for vm in vms:
+        p_debug("reading entries for vm {}".format(vm))
         vmdata = storage.getvmdata(vm, args.fromdate, args.todate)
+        p_debug("{} entries found".format(len(vmdata)))
 
         if len(vmdata) == 0:
             continue
@@ -206,6 +208,7 @@ if __name__ == "__main__":
 
     # Now get the analysis
     for vm, data in rawdata.items():
+        p_debug("evaluating data for vm {}".format(vm))
         _stats = DataSeries(data, args)
 
         stats = _stats.stats
