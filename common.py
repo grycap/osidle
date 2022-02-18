@@ -14,6 +14,7 @@
 #    limitations under the License.
 from datetime import datetime, timedelta
 import re
+import sys
 
 __verbose = False
 
@@ -36,20 +37,20 @@ def p_debug(*args):
     if __verbose > 0:
         for x in args:
             msg = "[DEBUG - {}] {}".format(datetime.now(), x)
-            print(msg)
+            sys.stderr.write(msg + "\n")
 def p_debugv(*args):
     global __verbose
     if __verbose > 1:
         p_debug(*args)
 def p_error(x):
     msg = "[ERROR - {}] {}".format(datetime.now(), x)
-    print(msg)
+    sys.stderr.write(msg + "\n")
 def p_info(x):
     msg = "[INFO - {}] {}".format(datetime.now(), x)
-    print(msg)
+    sys.stderr.write(msg + "\n")
 def p_warning(x):
     msg = "[WARNING - {}] {}".format(datetime.now(), x)
-    print(msg)
+    sys.stderr.write(msg + "\n")
 
 def toBytes(e):
     # Function that converts an expression with a suffix (K, G, M, etc.) to bytes
