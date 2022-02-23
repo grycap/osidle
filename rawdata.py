@@ -19,6 +19,8 @@ import json
 class RawData:
     def __init__(self, data, args):
         _data = RawData._convert(data)
+        # TODO: discard the first sample as it is just the historic data?
+        _data = _data[1:]
         self._data = RawData._get(_data, args.fromdate, args.todate)
         self._ncpu = None
         self._nnic = None

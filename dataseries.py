@@ -106,6 +106,56 @@ def _fragments(_data, tpos = None, vpos = 0, low = None, up = None, nfragments =
     result = [ t/total for t in fragments ]
     return result
 
+# DEPRECATED:
+# This method converts a series that has a repetition of values into a series that has a different repetition of values, by making the value proportional to the new repetition rate;
+#   Column "t" is the repetition amount and the total amount for such repetition is in column "c"; the idea is to make the series continuous and to make the new distribution of values
+#   i.e. ((40,100), (30, 90), (50, 200)) can be converted into ((30,75), (30, 25+60), (30, ...) ...)
+def _cluster(serie, t, c, tsize, skip=0):
+    n_serie = []
+    p_e = 0
+    p_disk_e = 0
+
+    for row in serie:
+        e = row[t]
+        disk = row[c]
+        disk_e = disk / e
+
+        # Calculate the amount for the first block (if there are remaining values to clusterize)
+        if p_e != 0:
+
+            # No esta bien calculado: el nuevo e es tsize o p_e + e como maximo: es p_e + max(e - p_e, tsize - p_e) )
+
+            n_e = min(e - p_e, tsize - p_e)
+            n_disk = disk_e * n_e + p_disk_e * p_e
+            n_serie.append((n_e + p_e, n_disk))
+            e = e - n_e
+
+        # Now the central amount
+        n = int(e // tsize)
+        n_serie.extend([(tsize, disk_e * tsize)] * n)
+
+        # Calculate the rest
+        p_e = e - n * tsize
+        p_disk_e = disk_e
+
+    if p_e > 0:
+        n_serie.append((p_e, p_disk_e * p_e))
+
+    return n_serie
+
+def _filter_saturation(serie, t, c, threshold, eps = 0.5):
+    for c_s in range(0, len(serie)):
+        e = serie[c_s][t]
+        disk = serie[c_s][c]
+
+        if disk > threshold:
+            diff_disk = disk - threshold
+            if (c_s < (len(serie) - 1)):
+                e_next = serie[c_s + 1][t]
+                n_val = ((serie[c_s + 1][c] * e_next) + (diff_disk * e * eps)) / e_next
+                serie[c_s + 1][c] = n_val
+            serie[c_s][c] = threshold
+
 def _evaluate_fragment(fragment, minval = 0, maxval = 10):
     # Calculate the points according to the position in the deciles os quartiles
     #   > in quartiles will have 4 pct of usage in 0-25%, 25-50%, 50-75% and 75-100%; 
@@ -128,7 +178,8 @@ class DataSeries:
         #   TODO(N): consider dividing the x["tcpu"] per ncpus to get the "for analysis" cpu time
         #       ANSWER: NO, because we want to be able to show the data; the "for analysis" cpu time is an internal value
         _data = rawdata.data
-        self._data_series = [ (x["e"], x["tcpu"]/x["e"], x["tdisk"]/x["e"], x["tnic"]/x["e"]) for x in _data ]
+        self._data_series = [ [x["e"], x["tcpu"]/x["e"], x["tdisk"]/x["e"], x["tnic"]/x["e"]] for x in _data ]
+        # n_data_series = _cluster(self._data_series, 0, 2, 60)
         self._vminfo = {
             "ncpu": rawdata.ncpu,
             "nnic": rawdata.nnic,
@@ -167,6 +218,10 @@ class DataSeries:
             diskdata = stats["disk"]["mean"]
             nicdata = stats["nic"]["mean"]
             cpudata = stats["cpu"]["mean"]
+
+        # Now we'll filter the disk information and the network to mitigate the impact of saturation
+        _filter_saturation(self._data_series, 0, 2, self._params["threshold_disk"], 0.75)
+        _filter_saturation(self._data_series, 0, 3, self._params["threshold_nic"], 0.75)
 
         # Calculate the decile distribution for each value
         decile = { 
