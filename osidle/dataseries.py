@@ -1,4 +1,4 @@
-#    
+#
 #    Copyright 2022 - Carlos A. <https://github.com/dealfonso>
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +12,8 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
-from common import *
+#
+from .common import *
 import math
 
 def _reduce(d, func, init = 0):
@@ -34,6 +35,9 @@ def basicstats(_data, tpos = 0, vpos = 1):
     values.sort(key=lambda x: x[1])
 
     count = sum([ x[0] for x in values ])
+    if count == 0:
+        return None
+
     amount = sum([ x[0] * x[1] for x in values ])
     meanval = amount / count
     mpoint = count // 2
@@ -159,6 +163,9 @@ def _filter_saturation(serie, t, c, threshold, eps = 0.5):
 def _evaluate_fragment(fragment, minval = 0, maxval = 10):
     # Calculate the points according to the position in the deciles os quartiles
     #   > in quartiles will have 4 pct of usage in 0-25%, 25-50%, 50-75% and 75-100%; 
+    if fragment is None:
+        return None
+
     result = 0
     max_p = len(fragment)
     for p in range(0, max_p):
@@ -205,19 +212,19 @@ class DataSeries:
     def _evaluate_stats(self, stats):
         if self._params["level"] == "medium":
             ncpu = self._vminfo["ncpu"] / 2
-            diskdata = stats["disk"]["median"]
-            nicdata = stats["nic"]["median"]
-            cpudata = stats["cpu"]["median"]
+            diskdata = stats["disk"]["median"] if stats["disk"] is not None else None
+            nicdata = stats["nic"]["median"] if stats["nic"] is not None else None
+            cpudata = stats["cpu"]["median"] if stats["cpu"] is not None else None
         elif self._params["level"] == "strict":
             ncpu = self._vminfo["ncpu"]
-            diskdata = stats["disk"]["min"]
-            nicdata = stats["nic"]["min"]
-            cpudata = stats["cpu"]["min"]
+            diskdata = stats["disk"]["min"] if stats["disk"] is not None else None
+            nicdata = stats["nic"]["min"] if stats["nic"] is not None else None
+            cpudata = stats["cpu"]["min"] if stats["cpu"] is not None else None
         else:
             ncpu = 1
-            diskdata = stats["disk"]["mean"]
-            nicdata = stats["nic"]["mean"]
-            cpudata = stats["cpu"]["mean"]
+            diskdata = stats["disk"]["mean"] if stats["disk"] is not None else None
+            nicdata = stats["nic"]["mean"] if stats["nic"] is not None else None
+            cpudata = stats["cpu"]["mean"] if stats["cpu"] is not None else None
 
         # Now we'll filter the disk information and the network to mitigate the impact of saturation
         _filter_saturation(self._data_series, 0, 2, self._params["threshold_disk"], 0.75)
@@ -234,19 +241,19 @@ class DataSeries:
             "disk": {
                 "score": _evaluate_fragment(decile["disk"]),
                 "data": decile["disk"],
-                "score2": round(min(10 * diskdata / self._params["threshold_disk"], 10), 2),
+                "score2": round(min(10 * diskdata / self._params["threshold_disk"], 10), 2) if diskdata is not None else None,
                 "data2": diskdata
             },
             "nic": {
                 "score": _evaluate_fragment(decile["nic"]),
                 "data": decile["nic"],
-                "score2": round(min(10 * nicdata / self._params["threshold_nic"], 10), 2),
+                "score2": round(min(10 * nicdata / self._params["threshold_nic"], 10), 2) if nicdata is not None else None,
                 "data2": nicdata
             },
             "cpu": {
                 "score": _evaluate_fragment(decile["cpu"]),
                 "data": decile["cpu"],
-                "score2": round(min(10 * cpudata / ncpu, 10), 2),
+                "score2": round(min(10 * cpudata / ncpu, 10), 2) if cpudata is not None else None,
                 "data2": cpudata
             }
         }

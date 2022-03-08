@@ -1,4 +1,4 @@
-#    
+#
 #    Copyright 2022 - Carlos A. <https://github.com/dealfonso>
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +12,7 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
+#
 from datetime import datetime, timedelta
 import re
 import sys
@@ -21,6 +22,9 @@ __verbose = False
 def setVerbose(set = 1):
     global __verbose
     __verbose = set
+
+def getVerbose():
+    return __verbose
 
 __now = None
 
@@ -194,12 +198,25 @@ def csvdump(_data):
 def p_debug_csv(data):
     p_debug("\n" + csvdump(data))
 
+# Function that returns the values of a set of fields, using the notation "f1.f2.f3" where f1, f2 and f3 are objects
+#
+# Example:
+#   given data = { a:1, b:2, c:{ d:3, e:4, f:{ g:5, h:6 } } }, and fields = [ "c.d", "a", "c.f.g" ] the return will be [ 3, 1, 5 ]
+#
+#   * if a field does not exist, the value will be None
+#
+# @param data is the original data from which to extract the values of the fields
+# @param fields is a list of fields to extract
+# @return the list of values of the requested fields
 def get_fields(_data, fields):
     result = []
     for field in fields:
         if isinstance(field, str):
             data = _data
             for d in field.split('.'):
+                if data is None:
+                    # This is the case when a field is not found
+                    break
                 if d in data:
                     data = data[d]
                 else:
@@ -212,7 +229,7 @@ def get_fields(_data, fields):
         else:
             result.append(field)
         
-    result = list(filter(lambda x: x is not None, result))
+    # result = list(filter(lambda x: x is not None, result))
     return result
 
 if __name__ == '__main__':

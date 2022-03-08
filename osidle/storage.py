@@ -1,4 +1,4 @@
-#    
+#
 #    Copyright 2022 - Carlos A. <https://github.com/dealfonso>
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,9 +12,10 @@
 #    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
+#
 import sqlite3
 import json
-from common import p_error, p_warning, p_debugv, p_debug, p_info
+from .common import p_error, p_warning, p_debugv, p_debug, p_info
 from datetime import datetime, timedelta
 
 DEFAULT_FILENAME = "monitoring.sqlite3"

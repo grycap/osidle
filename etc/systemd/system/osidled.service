@@ -1,0 +1,15 @@
+[Unit]
+Description=OpenStack VM monitoring for detecting idle VMs
+
+[Service]
+Type=simple
+
+# If not using "-u" option, the output will be buffered and so the logs won't be obtained in real time
+ExecStart=/usr/bin/python3 -u /usr/local/bin/osidled -c /etc/osidled.conf
+
+StandardOutput=append:/var/log/osidled.log
+StandardError=append:/var/log/osidled.log
+WorkingDirectory=/var/lib/osidled
+
+[Install]
+WantedBy=multi-user.target
