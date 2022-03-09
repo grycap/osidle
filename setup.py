@@ -16,6 +16,8 @@
 from distutils.command.config import config
 from setuptools import setup
 from setuptools.command.install import install
+from setuptools.command.develop import develop
+from setuptools.command.egg_info import egg_info
 import pathlib
 
 HERE = pathlib.Path(__file__).parent
@@ -33,7 +35,6 @@ data_files=[
 ]
 
 if __name__ == "__main__":
-
   import os
   import shutil
   import sys
@@ -46,6 +47,42 @@ if __name__ == "__main__":
   if args.overwrite_config:
     sys.argv.remove('--overwrite-config')
     overwriteconfig = True
+
+  def copyfiles():
+    global data_files, overwriteconfig
+    for folder, files in data_files:
+      if not os.path.exists(folder):
+        os.makedirs(folder)
+      if not os.path.isdir(folder):
+        raise Exception("Error: {} is not a directory\n".format(folder))
+      for file in files:
+        configfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), file)
+        if os.path.isdir(configfile):
+          print("es un directorio")
+          # It is a folder... so copy recursively
+          if overwriteconfig or not os.path.exists(os.path.join(folder, file)):
+            shutil.copytree(configfile, folder)
+          pass
+        elif os.path.isfile(configfile):
+          # It is a file... so copy it
+          if overwriteconfig or (not os.path.exists(os.path.join(folder, os.path.basename(file)))):
+            shutil.copy2(configfile, folder)
+        else:
+          raise Exception("Error: could not find file {}\n".format(file))            
+
+  class PostInstallCommand(install):
+    def run(self):
+      super().run()
+      copyfiles()
+
+  class PostDevelopCommand(develop):
+    def run(self):
+      super().run()
+      copyfiles()
+
+  class PostEggCommand(egg_info):
+    def run(self):
+      super().run()
 
   setup(
     name = 'osidle',            
@@ -65,6 +102,11 @@ if __name__ == "__main__":
             'tqdm',
             'xlsxwriter'
         ],
+    cmdclass={
+        'install': PostInstallCommand,
+        'develop': PostDevelopCommand,
+        'egg_info': PostEggCommand,
+    },
     classifiers=[
       'Development Status :: 4 - Beta',      # Chose either "3 - Alpha", "4 - Beta" or "5 - Production/Stable" as the current state of your package
       'Intended Audience :: System Administrators',
@@ -79,32 +121,5 @@ if __name__ == "__main__":
       ]
     },
     data_files=data_files
-    # data_files=[
-    #   # Copy the base configuration file to the global folder
-    #   ('/etc', ['etc/osidled.conf']),
-    #   # Prepare the service configuration file
-    #   ('/etc/systemd/system', ['etc/systemd/system/osidled.service']),
-    #   # Make sure that the working folder for the service is created
-    #   ('/var/lib/osidled/', [])             
-    # ]
   )
 
-  for folder, files in data_files:
-    if not os.path.exists(folder):
-      os.makedirs(folder)
-    if not os.path.isdir(folder):
-      raise Exception("Error: {} is not a directory\n".format(folder))
-    for file in files:
-      configfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), file)
-      if os.path.isdir(configfile):
-        print("es un directorio")
-        # It is a folder... so copy recursively
-        if overwriteconfig or not os.path.exists(os.path.join(folder, file)):
-          shutil.copytree(configfile, folder)
-        pass
-      elif os.path.isfile(configfile):
-        # It is a file... so copy it
-        if overwriteconfig or (not os.path.exists(os.path.join(folder, os.path.basename(file)))):
-          shutil.copy2(configfile, folder)
-      else:
-        raise Exception("Error: could not find file {}\n".format(file))
