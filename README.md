@@ -1,6 +1,58 @@
 # OpenStack IDLE VM Detector (osidle)
 This project tries to analyze the usage of the different servers (Virtual Machines) in an OpenStack deployment.
 
+Using `osidle` it is possible to obtain a list of all the servers in OpenStack, along with a score of how much they are used.
+
+In the next example:
+
+```console
+$ osidle --format csv -r --sort --include-eval-data-graph --from 2w
+ID,Overall,P. CPU,P. disk,P. nic,cpu graph,disk graph,nic graph
+1afe17bc-7029-4612-b328-519f003ae2d7,10.0,10.0,10.0,10.0,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+314df20c-e05a-40fe-9b01-b722bd19831a,10.0,10.0,10.0,10.0,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+a16e1ee3-6ab7-4be9-bd8a-bc8c21ef1657,9.95,9.84,10.0,10.0,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+51aaa1b7-953e-4e91-b66d-5930542bc5a3,9.84,9.53,10.0,10.0,▁▁▁▁▁▁▁▂▁▆,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+b1790317-d3fc-48e1-bf13-5cf9a1c4f3d6,9.81,9.44,10.0,10.0,▁▁▁▁▁▁▁▁▅▄,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+d8ab2848-6409-48de-b08b-875950703cd2,9.44,8.33,10.0,10.0,▁▁▁▁▁▁▄▁▁▅,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+5ebca45f-51dd-4214-a446-7930b98518eb,9.14,7.41,10.0,10.0,▁▁▁▁▃▂▁▂▁▄,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+8d333bb8-e22a-4dd9-a985-adcd705c4589,8.52,5.56,10.0,10.0,▁▁▁▁▁█▁▁▁▁,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+5490c981-f3a8-4974-9e51-0b0f193cbaae,8.46,5.37,10.0,10.0,▁▁▁▁▇▁▁▁▁▂,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+819acb6b-f3f8-424a-8951-0b56cec4ccd8,8.3,4.89,10.0,10.0,▂▁▁▁▄▂▁▁▁▂,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+251c39f6-91f1-4c6b-b283-af92724524ad,8.15,4.45,10.0,10.0,▁▁▁▁█▁▁▁▁▁,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+7a430a7f-ab2b-45ba-ab75-b94e4778171a,7.65,2.96,10.0,10.0,▁▁▃▆▁▁▁▁▁▁,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+710477c0-1dc6-41a7-82ea-278eca3f209a,7.42,4.38,10.0,7.87,▁▁▁▁█▁▁▁▁▁,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁█▁▁
+6596bf60-72b7-4415-a626-2b56bdcb69f0,7.41,2.23,10.0,10.0,▁▁█▁▁▁▁▁▁▁,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+0365694c-5ddf-469c-a673-6ac12b4fe3b0,6.68,0.04,10.0,10.0,█▁▁▁▁▁▁▁▁▁,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+4d3821d8-acf7-4c54-8602-a91c71686eba,6.68,0.05,10.0,10.0,█▁▁▁▁▁▁▁▁▁,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+71ffacb4-43c5-486f-8fb0-c71d30ca740c,6.68,0.05,10.0,10.0,█▁▁▁▁▁▁▁▁▁,▁▁▁▁▁▁▁▁▁█,▁▁▁▁▁▁▁▁▁█
+94aceec9-d8db-4222-82ca-eb8f6476df50,5.62,4.45,10.0,2.4,▁▁▁▁█▁▁▁▁▁,▁▁▁▁▁▁▁▁▁█,▁▁█▁▁▁▁▁▁▁
+73fa9b68-e2ef-4237-82d1-7e1f6fccfe1f,5.34,1.25,10.0,4.77,▁▇▂▁▁▁▁▁▁▁,▁▁▁▁▁▁▁▁▁█,▁▁▁▁█▁▁▁▁▁
+6892cfbc-8e4a-4094-8086-4218dce9b267,5.27,1.15,10.0,4.66,▁█▁▁▁▁▁▁▁▁,▁▁▁▁▁▁▁▁▁█,▁▁▁▁█▁▁▁▁▁
+b344e0c6-6a96-4360-8514-bf3cb6840190,4.55,2.26,10.0,1.39,▆▁▁▁▁▁▁▁▁▃,▁▁▁▁▁▁▁▁▁█,▇▁▁▁▁▁▁▁▁▂
+35324838-cf3b-4560-a86c-c2112f1cf961,3.4,0.0,10.0,0.21,█▁▁▁▁▁▁▁▁▁,▁▁▁▁▁▁▁▁▁█,█▁▁▁▁▁▁▁▁▁
+0be615ae-2a69-4d16-98d5-b446ca89926c,3.38,0.0,10.0,0.15,█▁▁▁▁▁▁▁▁▁,▁▁▁▁▁▁▁▁▁█,█▁▁▁▁▁▁▁▁▁
+3602d1c6-0fe1-4c89-9a68-2a63cbc6c04a,3.38,0.0,9.99,0.15,█▁▁▁▁▁▁▁▁▁,▁▁▁▁▁▁▁▁▁█,█▁▁▁▁▁▁▁▁▁
+d6bc1688-55de-48f1-93cd-4e14a6b01528,2.32,0.0,6.93,0.04,█▁▁▁▁▁▁▁▁▁,▁▁▁▁▁▂▆▂▁▁,█▁▁▁▁▁▁▁▁▁
+1ed7acc4-2142-4795-bc54-7fef7e18dbd4,1.39,0.02,1.74,2.4,█▁▁▁▁▁▁▁▁▁,▅▂▁▁▁▁▁▁▁▂,▁▁█▁▁▁▁▁▁▁
+b934037c-ed38-4e2f-9d03-73d0eb02fb51,0.61,0.0,1.6,0.22,█▁▁▁▁▁▁▁▁▁,▆▂▁▁▁▁▁▁▁▂,█▁▁▁▁▁▁▁▁▁
+17e13cd3-91f2-4098-b847-c0f3e0a08ddc,0.59,0.0,1.62,0.16,█▁▁▁▁▁▁▁▁▁,▆▂▁▁▁▁▁▁▁▂,█▁▁▁▁▁▁▁▁▁
+073e3fa3-2cc0-4312-86c1-65baf56ac86d,0.04,0.0,0.13,0.0,█▁▁▁▁▁▁▁▁▁,█▁▁▁▁▁▁▁▁▁,█▁▁▁▁▁▁▁▁▁
+ec5dad43-ee0e-4980-aeca-8b116c0a281e,0.04,0.0,0.13,0.0,█▁▁▁▁▁▁▁▁▁,█▁▁▁▁▁▁▁▁▁,█▁▁▁▁▁▁▁▁▁
+```
+
+After each VM ID, the following information is available:
+- Overall score: the average score of usage of the VM in the period. It is the mean of the usage scores of the VM, and it is between 0 and 10.
+- CPU score: the score for the usage of the CPU in the period. 10 would mean that the VM uses 100% of the CPU, while 0 would mean that the VM is not using any CPU.
+- Disk score: the score for the disk usage in the period. 10 would mean that the VM uses 100% of the disk, while 0 would mean that the VM is not using any disk.
+- NIC score: the score for using the network in the period. 10 would mean that the VM uses 100% of the NIC, while 0 would mean that the VM is not using any NIC.
+- CPU graph: is a chart that represents the usage of the CPU in the period. The chart is divided into 10 parts (0-10%, 10-20%, ..., 90-100%), and each part represents the percentage of time the CPU was using the corresponding percentage.
+- Disk graph: is a chart that represents the usage of the disk in the period.
+- NIC graph: is a chart that represents the usage of the NIC in the period.
+
+Using this information, it is possible to identify those VMs that are a candidate to be powered off due to the lack of usage.
+
+## Motivation
+
 The motivation for this project is that in a private cloud, users usually __launch VM and forget that they have been started__. This happens mainly because the users are not billed for the usage of private resources. But for the owner and the sysadmins, these _"launch-and-forgotten"_ servers are a headache: 1st because the resources are finite (private clouds are not Amazon's AWS clouds), and 2nd because using the resources prevent from rebooting the hosting servers (thus interrupt maintenance of the facilities).
 
 Moreover, according to the evidence, __users tend to overestimate the number of resources their servers need__ to run. And this is especially true when the resources are "free" (i.e. do not cost money). Instead, when a user starts a server in Amazon AWS, he tries to control the resources better because more resources mean more money. 
@@ -13,6 +65,25 @@ As a summary, the use cases for this project are
 1. to try to detect which servers are candidates to be powered off because they are not used.
 1. to try to detect overestimated servers, to try to resize them
 1. to try to detect the lack of flavours with the appropriate amount of resources
+
+## Levels of analysis
+
+`osidle` implements a number of different levels of analysis: `loose`, `medium` and `strict`. Using each of the levels, it is possible to obtain more information about the VMs and the infrastructure.
+
+The different levels of analysis correspond to the metrics used to evaluate the VMs.
+> The current version of `osidle` only consider different levels of usage for the CPU.
+
+- `loose`: consider that the VM have only 1 core. That means that the usage of the cores is summed up (see discussion).
+- `medium`: consider that the VM has half of the actual amount of cores.
+- `strict`: consider that the VM has the actual amount of cores.
+
+> `osidle` also implements an alternate method for evaluation of the VMs, but it is not used in the current version (it is under development).
+
+### Discussion
+
+A VM that has 4 cores but is using only 1 core at 100% in a period should be considered as "used". If using a _strict_ analysis, the VM would obtain a CPU score of 2.5. And if it is evaluated along with a low usage of disk and NIC, it would obtain an overall score under 1. As a result, it would be considered as a candidate to be powered off.
+
+But the decision of having 4 cores available for that VM is not made by the user. But the user may have been forced to get such an amount of cores because of the flavours available. Maybe the user wanted more memory and less cores, but he could not find any suitable flavour. This is why the sysadmin should re-evaluate the flavours.
 
 # Workflow
 
