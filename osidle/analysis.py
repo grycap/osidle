@@ -25,6 +25,7 @@ from tqdm import tqdm
 import argparse
 import os
 import xlsxwriter
+import math
 
 def dataset_to_barchart(data, lower = None, upper = None):
 
@@ -136,6 +137,7 @@ def osidle_analysis():
     parser.add_argument("-o", "--sort", dest="sort", help="Sort the output descending by estimated usage of the VM", action="store_true", default=False)
     parser.add_argument("-i", "--vm-id", dest="vmids", action="append", help="id of the VMs to be analyzed (can appear multiple times)", type=str)
     parser.add_argument("-v", "--verbose", dest="verbose", help="verbose", action="store_true", default=False)
+    parser.add_argument("--full-report", dest="fullreport", help="this is a shorthand for --include-eval-data, --include-eval-data-graph and --include-stats", action="store_true", default=False)
     parser.add_argument("-vv", "--verbose-more", dest="verbosemore", help="verbose more", action="store_true", default=False)
     parser.add_argument("--include-eval-data", dest="include_eval_data", action="store_true", default=False, help="include data used for evaluation")
     parser.add_argument("--include-eval-data-graph", dest="include_eval_data_graph", action="store_true", default=False, help="include data used for evaluation but using a graphical representation (uses utf-8 encoding)")
@@ -163,6 +165,11 @@ def osidle_analysis():
     endTime = storage.getmaxt()
 
     # Correct the arguments using the keywords and special values
+    if args.fullreport:
+        args.include_eval_data = True
+        args.include_eval_data_graph = True
+        args.include_stats = True
+        
     args = correctArguments(args, beginTime, endTime)
 
     # Get information
@@ -298,9 +305,9 @@ def osidle_analysis():
         h_evaluation = [ *h_evaluation, "P. CPU" ]
         fmt_evaluation = [ *fmt_evaluation, 0 ]
         if args.include_eval_data:
-            f_data = [ *f_data, "cpu.data" ]
-            h_data = [ *h_data, "cpu 0-10", "cpu 10-20", "cpu 20-30", "cpu 30-40", "cpu 40-50", "cpu 50-60", "cpu 60-70", "cpu 70-80", "cpu 80-90", "cpu 90-100" ]
-            fmt_data = [ *fmt_data, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, None ]
+            f_data = [ *f_data, "cpu.data", "cpu.cores" ]
+            h_data = [ *h_data, "cpu 0-10", "cpu 10-20", "cpu 20-30", "cpu 30-40", "cpu 40-50", "cpu 50-60", "cpu 60-70", "cpu 70-80", "cpu 80-90", "cpu 90-100", "Suggested cores" ]
+            fmt_data = [ *fmt_data, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 0 ]
         if args.include_eval_data_graph:
             f_data = [ *f_data, "cpu.graph" ]
             h_data = [ *h_data, "cpu graph" ]
@@ -352,6 +359,7 @@ def osidle_analysis():
 
         stats = _stats.stats
         evaluation = _stats.evaluation
+        evaluation["cpu"]["cores"] = math.ceil(_stats.stats["cpu"]["max"]) if _stats.stats["cpu"] is not None else 0
 
         total = 0
         total_n = 0
@@ -411,12 +419,13 @@ def osidle_analysis():
         pbar.close()
 
     # Finally, dump the data, depending on the format (moreover we'll sort it and summarize the data, depending on the options)
-    if args.format == "json":
+    if args.format == "json" or args.format == "shell":
         if args.summarize:
             result = { k:v for k,v in result.items() if v["overall"] < args.threshold_summarize }
 
         if args.sort:
-            result = sorted(result.items(), key=lambda x: x[1]["overall"], reverse=True)
+            result = dict(sorted(result.items(), key=lambda x: x[1]["overall"], reverse=True))
+
     else:
         if args.summarize:
             result = [ x for x in result if x[1] < args.threshold_summarize ]
@@ -433,6 +442,8 @@ def osidle_analysis():
         fields = [ "disk.score", "cpu.score", "nic.score", "overall" ]
         if args.include_eval_data_graph:
             fields = [ *fields, "disk.graph", "cpu.graph", "nic.graph" ]
+        if args.include_eval_data:
+            fields = [ *fields, "cpu.cores" ]
         if args.include_stats:
             fields = [ *fields, 
                 "stats.disk.min", "stats.disk.max", "stats.disk.mean", "stats.disk.median", 
@@ -440,6 +451,7 @@ def osidle_analysis():
                 "stats.nic.min", "stats.nic.max", "stats.nic.mean", "stats.nic.median" 
             ]
         c = 0
+
         for vm, _r in result.items():
             output = [
                 "ID_{}={}".format(c, vm)
@@ -478,7 +490,10 @@ def osidle_analysis():
                             })
                         c_fmt = formats[j]
                         
-                    worksheet.write(i+1, j, result[i][j], c_fmt)
+                    if c_fmt is None:
+                        worksheet.write(i+1, j, result[i][j])
+                    else:
+                        worksheet.write(i+1, j, result[i][j], c_fmt)
             workbook.close()
         else:
             output_file.println(",".join(headers))
