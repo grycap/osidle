@@ -122,6 +122,6 @@ if __name__ == "__main__":
         'osidle-packdb=osidle.packdb:osidle_packdb',
       ]
     },
-    data_files=data_files
+    # data_files=data_files
   )
 
