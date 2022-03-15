@@ -44,7 +44,7 @@ class Token:
         # Make a request to create the token
         try:
             p_debugv("creating a new token at {}/auth/tokens".format(url_base))
-            token_req = requests.post("{}/auth/tokens".format(url_base), data=json.dumps(obj), headers=headers, timeout = 15)
+            token_req = requests.post("{}/auth/tokens".format(url_base), data=json.dumps(obj), headers=headers, timeout = 5)
         except Exception as e:
             p_error("Could not connect to OpenStack: {}".format(e))
             return False
@@ -124,7 +124,7 @@ def getServers(token):
         return None
 
     try:
-        servers_req = requests.get(token.url + "/servers?all_tenants=1", headers = {'X-Auth-Token': token.token })
+        servers_req = requests.get(token.url + "/servers?all_tenants=1", headers = {'X-Auth-Token': token.token }, timeout = 5)
     except Exception as e:
         print(e)
         p_error("Could not connect to OpenStack")
@@ -143,7 +143,7 @@ def getServerInfo(token, id):
         return None
 
     try:
-        serverinfo_req = requests.get("{}/servers/{}/diagnostics".format(token.url, id), headers = {'X-Auth-Token': token.token , "X-OpenStack-Nova-API-Version": "2.48"})
+        serverinfo_req = requests.get("{}/servers/{}/diagnostics".format(token.url, id), headers = {'X-Auth-Token': token.token , "X-OpenStack-Nova-API-Version": "2.48"}, timeout = 15)
     except:
         p_error("Could not connect to OpenStack")
         return None
