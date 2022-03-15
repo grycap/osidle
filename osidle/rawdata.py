@@ -17,6 +17,8 @@ import copy
 from datetime import datetime, timedelta
 import json
 
+from osidle.common import p_warning
+
 class RawData:
     def __init__(self, data, args):
         _data = RawData._convert(data)
@@ -129,6 +131,10 @@ class RawData:
             if "conflictingRequest" in d:
                 continue
 
+            d["tcpu"] = sum(x["time"] for x in d["cpu_details"]) * 1e-9
+            d["tdisk"] = sum([ x["read_bytes"] + x["write_bytes"] for x in d["disk_details"] ])
+            d["tnic"] = sum([ x["rx_octets"] + x["tx_octets"] for x in d["nic_details"] ])
+
             # If it is the first sample, we'll use it as the base but we need to convert it to a "pseudo-incremental" sample that
             # starts the series with values set to 0. It is needed to adjust the timestamp
             if d0 is None:
@@ -156,6 +162,9 @@ class RawData:
                 for n in d0["nic_details"]:
                     n['rx_octets'] = 0
                     n['tx_octets'] = 0
+                d0["tcpu"] = 0
+                d0["tdisk"] = 0
+                d0["tnic"] = 0
 
             # Calculate the current incremental sample by subtracting the previous sample from the current one (also conver cpu from nanoseconds to seconds)
             d1 = {
@@ -164,25 +173,40 @@ class RawData:
                 "ncpu": len(d['cpu_details']),
                 "ndisk": len(d['disk_details']),
                 "nnic": len(d['nic_details']),
-                "cpu": [ (d['cpu_details'][i]['time'] - d0['cpu_details'][i]['time'])*1e-9 for i in range(0, len(d['cpu_details'])) ],
-                "disk": [ { "r": d['disk_details'][i]['read_bytes'] - d0['disk_details'][i]['read_bytes'], "w": d['disk_details'][i]['write_bytes'] - d0['disk_details'][i]['write_bytes'] } for i in range(0, len(d['disk_details'])) ],
-                "nic": [ { "rx": d['nic_details'][i]['rx_octets'] - d0['nic_details'][i]['rx_octets'], "tx": d['nic_details'][i]['tx_octets'] - d0['nic_details'][i]['tx_octets'] } for i in range(0, len(d['nic_details'])) ],
+                "tcpu": sum(x["time"] for x in d["cpu_details"]) * 1e-9,
+                "tdisk": sum([ x["read_bytes"] + x["write_bytes"] for x in d["disk_details"] ]),
+                "tnic": sum([ x["rx_octets"] + x["tx_octets"] for x in d["nic_details"] ]),
             }
+            # TODO: what to do with resized instances (either the number of CPUs or the number of NICs or the number of DISKs)
 
-            # TODO: now we have to calculate the values of T, S and e both for d and for d1
-            # So we have to calculate the elapsed time, which is the difference between the timestamp of the previous sample and the current one
-            d1["e"] = d["s"] - d0["s"]
-            d1["S"] = d["s"] - d1["e"]
-            d1["T"] = datetime.fromtimestamp(d1["S"]).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            if d0["tcpu"] > d1["tcpu"] or d0["tdisk"] > d1["tdisk"] or d0["tnic"] > d1["tnic"]:
+                # The VM has been stopped and started again later; will not subtract the previous sample from the current one
 
-            d1["tcpu"] = sum(d1["cpu"])
-            d1["tdisk"] = sum([ x for n in d1["disk"] for x in [n["r"], n["w"]]])
-            d1["tnic"] = sum([ x for n in d1["nic"] for x in [n["rx"], n["tx"]]])
+                # We'll skip the sample, because we do not know the time from the previous sample: the requests between this and the previous one
+                #   are conflicting and we cannot calculate the incremental consumption.
+
+                # TODO: When a VM is stopped and started later, the amount of CPU is reset to 0...
+                #   the same happens to disk and nic, but not the uptime. 
+                p_warning("Skipping sample with negative number of CPUs, disks or NICs (the VM was probably shut down)")
+            else:
+                d1["tcpu"] = d1["tcpu"] - d0["tcpu"]
+                d1["tdisk"] = d1["tdisk"] - d0["tdisk"]
+                d1["tnic"] = d1["tnic"] - d0["tnic"]
+
+                # TODO: now we have to calculate the values of T, S and e both for d and for d1
+                # So we have to calculate the elapsed time, which is the difference between the timestamp of the previous sample and the current one
+                d1["e"] = d["s"] - d0["s"]
+                d1["S"] = d["s"] - d1["e"]
+                d1["T"] = datetime.fromtimestamp(d1["S"]).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+                # d1["tcpu"] = sum(d1["cpu"])
+                # d1["tdisk"] = sum([ x for n in d1["disk"] for x in [n["r"], n["w"]]])
+                # d1["tnic"] = sum([ x for n in d1["nic"] for x in [n["rx"], n["tx"]]])
+
+                # Add the incremental sample to the result
+                converted.append(d1)
 
             # Store the sample to be the reference for the previous one
             d0 = d
-
-            # Add the incremental sample to the result
-            converted.append(d1)
 
         return converted
