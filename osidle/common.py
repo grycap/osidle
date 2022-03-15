@@ -46,9 +46,11 @@ def p_debugv(*args):
     global __verbose
     if __verbose > 1:
         p_debug(*args)
-def p_error(x):
+def s_error(x):
     msg = "[ERROR - {}] {}".format(datetime.now(), x)
-    sys.stderr.write(msg + "\n")
+    return msg
+def p_error(x):
+    sys.stderr.write(s_error(x) + "\n")
 def p_info(x):
     msg = "[INFO - {}] {}".format(datetime.now(), x)
     sys.stderr.write(msg + "\n")
@@ -231,6 +233,29 @@ def get_fields(_data, fields):
         
     # result = list(filter(lambda x: x is not None, result))
     return result
+
+def strtobool (val, yesvals = ["yes", "y"], novals = ["no", "n"]):
+    """Convert a string representation of truth to true (1) or false (0).
+    Raises ValueError if 'val' is anything else."""
+    val = val.lower()
+    if val in yesvals:
+        return 1
+    elif val in novals:
+        return 0
+    else:
+        raise ValueError("invalid truth value {}".format(val))
+
+def user_yes_no_query(question, default='y'):
+    choices = 'Y/n' if default.lower() in ('y', 'yes') else 'y/N'
+    sys.stdout.write('{} ({})\n'.format(question, choices))
+    while True:
+        try:
+            choice = input().lower()
+            if choice == '':
+                choice = default.lower()
+            return strtobool(choice)
+        except ValueError:
+            sys.stdout.write('Please respond with \'y\' or \'n\'.\n')
 
 if __name__ == '__main__':
     p_debug(toDate("now-10d"))
