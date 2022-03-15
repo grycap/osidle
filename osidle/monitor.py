@@ -17,7 +17,7 @@ import time
 from .common import *
 from .osconnect import getServers, getServerInfo, Token
 from datetime import datetime
-from .storage import Storage
+from .storage import Storage, remove_unneeded_data
 from .runcommand import runcommand_e
 import argparse
 from .configuration import Configuration
@@ -29,9 +29,6 @@ MAIN_LOOP_INTERVAL = 1
 
 # The idea is to be kind with the system: make monitorings of MONITORING_VM_BLOCK_TIME seconds, monitoring up to MONITORING_VM_BLOCKSIZE VMs
 #   and then wait MONITORING_VM_INTERVAL before trying to monitor the next VM block
-
-# Max age of samples (30 days)
-MAX_AGE = 60 * 60 * 24 * 30
 
 class Monitor:
     def __init__(self, db):
@@ -58,8 +55,9 @@ class Monitor:
     def havePendingVMs(self):
         return len(self._pending_vms)
 
-    def monitorVMs(self, limit = None, walltime = 0, conflicting_alert = False):
+    def monitorVMs(self, limit = None, walltime = 0, conflicting_alert = False, filter_fnc = lambda x: x):
         count = 0
+        failed = 0
 
         p_debugv("{} VMs pending of monitorisation".format(len(self._pending_vms)))
 
@@ -71,6 +69,7 @@ class Monitor:
             # Get the VM info
             serverInfo = getServerInfo(self._token, nextId)
             if serverInfo is None:
+                failed += 1
                 p_error("failed to obtain VM info from OpenStack")
 
             # Get the VM status
@@ -79,7 +78,7 @@ class Monitor:
                 serverInfo = None
             
             if serverInfo is not None:
-                self._db.savevm(nextId, serverInfo)
+                self._db.savevm(nextId, filter_fnc(serverInfo))
 
             count += 1
             t1 = datetime.now().timestamp()
@@ -88,6 +87,7 @@ class Monitor:
             t0 = t1
 
         p_debug("{} VMs monitored".format(count))
+        return failed
 
 def osidle_monitor():
     config = Configuration({
@@ -123,7 +123,9 @@ def osidle_monitor():
                 # The authentication URL to connect to the OpenStack server (default: None)
                 "OS_AUTH_URL": ("", lambda x: None if x == "" else x),
                 # In case that a VM is not running, OpenStack returns a "conflicting error" and osidle monitor will notify about them. This option allows to ignore such errors (default: False)
-                "SILENCE_CONFLICTING": False
+                "SILENCE_CONFLICTING": False,
+                # By default, osidle monitor will store the raw data obtained for each VM. Changing this option allows to store only the data that will use osidle (default: True, to store the raw data)
+                "STORE_RAW_DATA": True,
             }
         }
     )
@@ -139,10 +141,9 @@ def osidle_monitor():
             p_error("failed to read configuration file")
             exit(1)
     else:
-        (configfiles, configuration) = config.read([ "./osidled.conf", "/etc/osidle/osidled.conf", "/etc/osidled.conf" ])
+        (configfiles, configuration) = config.read([ "./osidled.conf", "/etc/osidle/osidled.conf", "/etc/osidled.conf" ], True)
 
     configuration = configuration["DEFAULT"]
-
     parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
     parser.add_argument("-b", "--block-size", dest="blocksize", default=configuration["MONITORING_VM_BLOCKSIZE"], help="The maximum number of VMs to be monitored in a row", type=int)
     parser.add_argument("-t", "--block-time", dest="blocktime", type=int, default=configuration["MONITORING_VM_BLOCK_TIME"], help="The maximum time to be used to monitor a block of VMs")
@@ -157,6 +158,7 @@ def osidle_monitor():
     parser.add_argument("-U", "--os-username", dest="username", help="OpenStack username (if not set, will be obtained using OS_USERNAME env var)", default=configuration["OS_USERNAME"])
     parser.add_argument("-P", "--os-password", dest="password", help="OpenStack password  (if not set, will be obtained using OS_PASSWORD env var)", default=configuration["OS_PASSWORD"])
     parser.add_argument("-H", "--os-auth", dest="keystone", help="OpenStack keytsone authentication endpoint (if not set, will be obtained using OS_AUTH_URL env var)", default=configuration["OS_AUTH_URL"])
+    parser.add_argument("-r", "--remove-unneeded-data", dest="storerawdata", help="Remove the unneeded data before storing it", action="store_false", default=configuration["STORE_RAW_DATA"])
     parser.add_argument('--version', action='version', version=VERSION)
 
     try:
@@ -197,16 +199,42 @@ def osidle_monitor():
     t00 = datetime.now().timestamp()
     p_info("starting the monitoring loop")
     tN_0 = 0
+    filter_fnc = lambda x: x
+
+    # List of errors
+    error_list = []
+
+    if not args.storerawdata:
+        p_debug("removing the unneeded data")
+        filter_fnc = remove_unneeded_data
+
     while True:
         try:
             t1 = datetime.now()
             t1 = t1.timestamp()
 
+            if len(error_list) > 0:
+                if t1 - tN_0 > configuration["NOTIFICATION_INTERVAL"]:
+                    tN_0 = t1
+
+                    if args.notification is not None:
+                        p_debug("notifying using command {}".format(args.notification))
+                        retcode, cout, cerr = runcommand_e(args.notification, strin = "\n".join(error_list).encode("utf-8"))
+                        p_debug("notification command returned {}".format(retcode))
+                        p_debugv("notification command stdout: {}".format(cout))
+                        p_debugv("notification command stderr: {}".format(cerr))
+
+                    p_error("{} errors happened during the last {} seconds".format(len(error_list), configuration["NOTIFICATION_INTERVAL"]))
+                    error_list = []
+
             if (t0_vm + args.blocktime) < t1:
                 if monitor.havePendingVMs():
                     p_debug("monitorising up to {} vms".format(args.blocksize))
 
-                    monitor.monitorVMs(args.blocksize, args.blocktime, args.conflicting)
+                    failed = monitor.monitorVMs(args.blocksize, args.blocktime, args.conflicting, filter_fnc)
+                    if failed > 0:
+                        p_debug("failed to monitor {} vms".format(failed))
+                        error_list.append(s_error("failed to monitor {} vms".format(failed)))
 
                 t0_vm = datetime.now().timestamp()
 
@@ -223,15 +251,8 @@ def osidle_monitor():
                 t00 = t1
 
         except Exception as e:
-            tN = datetime.now().timestamp()
-            if tN - tN_0 > configuration["ERROR_MESSAGE_NOTIFICATION_INTERVAL"]:
-                tN_0 = tN
-                p_error(e)
-                if args.notification != "None":
-                    retcode, cout, cerr = runcommand_e(args.notification, strin = "{}".format(e).encode("utf-8"))
-                    p_debug("notification command returned {}".format(retcode))
-                    p_debugv("notification command stdout: {}".format(cout))
-                    p_debugv("notification command stderr: {}".format(cerr))
+            p_error('Error: {}'.format(e))
+            error_list.append(s_error(str(e)))
 
         p_debugv("wait {}".format(args.mainloop))
         time.sleep(args.mainloop)
