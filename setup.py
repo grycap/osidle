@@ -118,6 +118,7 @@ if __name__ == "__main__":
       'console_scripts' : [
         'osidle=osidle.analysis:osidle_analysis',
         'osidled=osidle.monitor:osidle_monitor',
+        'osidle-packdb=osidle.packdb:osidle_packdb',
       ]
     },
     data_files=data_files

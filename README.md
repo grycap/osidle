@@ -90,6 +90,7 @@ But the decision of having 4 cores available for that VM is not made by the user
 This server has two parts:
 1. A __monitor__ that periodically contacts OpenStack and gets the metrics for the usage of the servers
 2. An application that can be used to __analyze the data__
+3. An application to discard old data
 
 ## Technical details
 
@@ -188,6 +189,8 @@ OS_PASSWORD =
 OS_AUTH_URL =
 # In case that a VM is not running, OpenStack returns a "conflicting error" and osidle monitor will notify about them. This option allows to ignore such errors (default: False)
 SILENCE_CONFLICTING = False
+# By default, osidle monitor will store the raw data obtained for each VM. Changing this option allows to store only the data that will use osidle (default: True, to store the raw data)
+STORE_RAW_DATA = True
 ```
 
 #### Monitor in foreground
@@ -336,4 +339,27 @@ stats_nic_max_0=207074.88944415632
 stats_nic_mean_0=3186.7576530164206
 stats_nic_median_0=2967.3510363628907
 ```
+
+### Utilities
+
+`osidle-packdb` is included, to reduce the size of the database by removing old entries, and reducing the size of the existing data.
+
+The data can be reduced because the data stored in the database is the raw data produced by OpenStack. This is made in this way, just in case that the data needs to to be inspected. `osidle-packdb` removes the unneeded fields from the data.
+
+On the other side, the analysis of the data may have a sense for a period of time. `osidle` has no purpose of being an accounting tool, and so it is advisable to discard the registries that would fall out of the analysis period, for sure. The `osidle-packdb` utility can be used to remove the data that is not needed anymore.
+
+Please refer to the documentation of the `osidle-packdb` command for more details (i.e. `--help` option).
+
+Some of the options of the `osidle-packdb` command are:
+
+* --quiet: use the quiet mode
+* --yes: answer yes to all questions
+* --no-backup: do not backup the database before packing it (have in mind that the database will be modified and the changes cannot be undone)
+* --backup-filename: name of the file in which to store the backup of the database. If not provided, a new file will be created using a timestamp.
+* --overwrite: overwrite the backup file if it already exists
+* --keep-from: discard any sample before this date. 
+    > _Note:_ It is possible to use the following format: `[<reference>-]count[<unit>]`. Where reference is one of `now`, `begin`, `end`, `lastweek`..., and count is an integer. The unit is one of `s`, `m`, `h`, `d`, `w`, `M`, `y`. For example, `--keep-from=now-1M` will discard the samples taken before 1 month ago.
+* --keep-to: discard any sample after this date. The format is the same than `--keep-from` parameter. 
+* --database: the database file to use (Default: /var/lib/osidled/osidled.db)
+* --minimize: remove the unneeded data from the entries in the database
 
