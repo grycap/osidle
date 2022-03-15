@@ -28,6 +28,7 @@ from osidle.version import VERSION
 data_files=[
   # Copy the base configuration file to the global folder
   ('/etc', ['etc/osidled.conf']),
+  ('/etc/default', ['etc/osidled.conf']),
   # Prepare the service configuration file
   ('/etc/systemd/system', ['etc/systemd/system/osidled.service']),
   # Make sure that the working folder for the service is created

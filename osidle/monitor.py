@@ -141,7 +141,7 @@ def osidle_monitor():
             p_error("failed to read configuration file")
             exit(1)
     else:
-        (configfiles, configuration) = config.read([ "./osidled.conf", "/etc/osidle/osidled.conf", "/etc/osidled.conf" ], True)
+        (configfiles, configuration) = config.read([ "./osidled.conf", "/etc/osidle/osidled.conf", "/etc/osidled.conf", "/etc/default/osidled.conf" ], False)
 
     configuration = configuration["DEFAULT"]
     parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
