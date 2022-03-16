@@ -303,7 +303,7 @@ def osidle_analysis():
             fmt_stats = [ *fmt_stats, 10, 10, 10, 10 ]
         f_evaluation = [ *f_evaluation, "cpu.score" ]
         h_evaluation = [ *h_evaluation, "P. CPU" ]
-        fmt_evaluation = [ *fmt_evaluation, 0 ]
+        fmt_evaluation = [ *fmt_evaluation, "0.00" ]
         if args.include_eval_data:
             f_data = [ *f_data, "cpu.data", "cpu.cores" ]
             h_data = [ *h_data, "cpu 0-10", "cpu 10-20", "cpu 20-30", "cpu 30-40", "cpu 40-50", "cpu 50-60", "cpu 60-70", "cpu 70-80", "cpu 80-90", "cpu 90-100", "Suggested cores" ]
@@ -320,7 +320,7 @@ def osidle_analysis():
             fmt_stats = [ *fmt_stats, 0, 0, 0, 0 ]
         f_evaluation = [ *f_evaluation, "disk.score" ]
         h_evaluation = [ *h_evaluation, "P. disk" ]
-        fmt_evaluation = [ *fmt_evaluation, 0 ]
+        fmt_evaluation = [ *fmt_evaluation, "0.00" ]
         if args.include_eval_data:
             f_data = [ *f_data, "disk.data" ]
             h_data = [ *h_data, "disk 0-10", "disk 10-20", "disk 20-30", "disk 30-40", "disk 40-50", "disk 50-60", "disk 60-70", "disk 70-80", "disk 80-90", "disk 90-100" ]
@@ -336,7 +336,7 @@ def osidle_analysis():
             fmt_stats = [ *fmt_stats, 0, 0, 0, 0 ]
         f_evaluation = [ *f_evaluation, "nic.score" ]
         h_evaluation = [ *h_evaluation, "P. nic" ]
-        fmt_evaluation = [ *fmt_evaluation, 0 ]
+        fmt_evaluation = [ *fmt_evaluation, "0.00" ]
         if args.include_eval_data:
             f_data = [ *f_data, "nic.data" ]
             h_data = [ *h_data, "nic 0-10", "nic 10-20", "nic 20-30", "nic 30-40", "nic 40-50", "nic 50-60", "nic 60-70", "nic 70-80", "nic 80-90", "nic 90-100" ]
@@ -361,27 +361,26 @@ def osidle_analysis():
         evaluation = _stats.evaluation
         evaluation["cpu"]["cores"] = math.ceil(_stats.stats["cpu"]["max"]) if _stats.stats["cpu"] is not None else 0
 
-        total = 0
-        total_n = 0
-
         # Calculate the overall score from the evaluation
         # TODO: check whether to use the 2nd value or not (this is more strict)
+        scores = []
+
         if args.analysis_cpu and evaluation["cpu"]["score"] is not None:
-            total += evaluation["cpu"]["score"]
-            total_n += 1
+            scores.append(evaluation["cpu"]["score"])
+
         if args.analysis_nic and evaluation["nic"]["score"] is not None:
-            total += evaluation["nic"]["score"]
-            total_n += 1
+            scores.append(evaluation["nic"]["score"])
+
         if args.analysis_disk and evaluation["disk"]["score"] is not None:
-            total += evaluation["disk"]["score"]
-            total_n += 1
+            scores.append(evaluation["disk"]["score"])
         
         # If wanted to remove the unknown values, we do it here
-        if total_n == 0 and args.removeunknown:
+        if (len(scores) == 0) and args.removeunknown:
             p_debugv("removing vm {} because it has no valid data".format(vm))
             continue
 
-        overall = round(total / max(1, total_n), 2)
+        # TODO: use the weighted means?
+        overall = round(sum(scores) / len(scores), 2) if len(scores) > 0 else 0
 
         # If wanted to dump the stats, add them to the evaluation
         if args.include_stats:
