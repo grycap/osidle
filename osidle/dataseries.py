@@ -147,6 +147,16 @@ def _cluster(serie, t, c, tsize, skip=0):
 
     return n_serie
 
+# The idea of this function is to make a filter to the data, so that if a timestep the value saturates (i.e. gets upper to a threshold), the value is set to the threshold
+#   and the remaining amount is added to the next timestep, so that the value is not lost. But the amount added is not the whole amount; instead, it is minored by the
+#   an epsilon value.
+# The underlying use case is the following:
+#   - a VM downloads 10 Gb in just 1 minute, but this is because of the network (either the local endpoint or the remote endpoint)
+#   - the same VM may have been downloaded the same amount of data in 1 hour, because the network was slower.
+#   - both VMs have been used. If the threshold was 8Kbps, both VMs pass the threshold but the first has a lower score because it was downloading less time.
+# Using this filter, the evaluation mechanism tries to be more fair. If the epsilon is too big, the big transferences will be overrated while the small ones will be underrated.
+#   * At the end, this is a subjective matter, bucause the actual fact is that the first VM has used the network less time than the second one. So the second VM has been "used"
+#     more time than the first one.
 def _filter_saturation(serie, t, c, threshold, eps = 0.5):
     for c_s in range(0, len(serie)):
         e = serie[c_s][t]
@@ -210,25 +220,29 @@ class DataSeries:
 
 
     def _evaluate_stats(self, stats):
+        eps = 0.75
         if self._params["level"] == "medium":
+            eps = 0.75
             ncpu = self._vminfo["ncpu"] / 2
             diskdata = stats["disk"]["median"] if stats["disk"] is not None else None
             nicdata = stats["nic"]["median"] if stats["nic"] is not None else None
             cpudata = stats["cpu"]["median"] if stats["cpu"] is not None else None
         elif self._params["level"] == "strict":
+            eps = 0.25
             ncpu = self._vminfo["ncpu"]
             diskdata = stats["disk"]["min"] if stats["disk"] is not None else None
             nicdata = stats["nic"]["min"] if stats["nic"] is not None else None
             cpudata = stats["cpu"]["min"] if stats["cpu"] is not None else None
         else:
+            eps = 0.85
             ncpu = 1
             diskdata = stats["disk"]["mean"] if stats["disk"] is not None else None
             nicdata = stats["nic"]["mean"] if stats["nic"] is not None else None
             cpudata = stats["cpu"]["mean"] if stats["cpu"] is not None else None
 
         # Now we'll filter the disk information and the network to mitigate the impact of saturation
-        _filter_saturation(self._data_series, 0, 2, self._params["threshold_disk"], 0.75)
-        _filter_saturation(self._data_series, 0, 3, self._params["threshold_nic"], 0.75)
+        _filter_saturation(self._data_series, 0, 2, self._params["threshold_disk"], eps)
+        _filter_saturation(self._data_series, 0, 3, self._params["threshold_nic"], eps)
 
         # Calculate the decile distribution for each value
         decile = { 
