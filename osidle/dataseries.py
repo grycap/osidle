@@ -223,7 +223,7 @@ class DataSeries:
         eps = 0.75
         if self._params["level"] == "medium":
             eps = 0.75
-            ncpu = self._vminfo["ncpu"] / 2
+            ncpu = max(math.ceil(stats["cpu"]["max"]) if stats["cpu"] is not None else 1, 1)
             diskdata = stats["disk"]["median"] if stats["disk"] is not None else None
             nicdata = stats["nic"]["median"] if stats["nic"] is not None else None
             cpudata = stats["cpu"]["median"] if stats["cpu"] is not None else None
