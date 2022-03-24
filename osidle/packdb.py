@@ -105,7 +105,7 @@ def osidle_packdb():
     def prefilter(rowcount):
         global pbar
         if not args.quiet:
-            pbar = tqdm(total=rowcount, desc="Processing entries", unit="entry")
+            pbar = tqdm(total=rowcount, desc="Processing entries", unit="entries")
 
     def postfilter():
         if not args.quiet:
