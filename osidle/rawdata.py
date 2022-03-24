@@ -130,6 +130,8 @@ class RawData:
             # Skip the samples that do not have information
             if "conflictingRequest" in d:
                 continue
+            if "itemNotFound" in d:
+                continue
 
             d["tcpu"] = sum(x["time"] for x in d["cpu_details"]) * 1e-9
             d["tdisk"] = sum([ x["read_bytes"] + x["write_bytes"] for x in d["disk_details"] ])

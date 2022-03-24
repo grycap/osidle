@@ -207,6 +207,8 @@ class Storage:
 def remove_unneeded_data(data):
     if 'conflictingRequest' in data:
         return data
+    if 'itemNotFound' in data:
+        return data
         
     return {
         "cpu_details": [ { "time": x["time"] } for x in data["cpu_details"] ],
