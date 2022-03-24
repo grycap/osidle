@@ -227,9 +227,15 @@ class DataSeries:
             diskdata = stats["disk"]["median"] if stats["disk"] is not None else None
             nicdata = stats["nic"]["median"] if stats["nic"] is not None else None
             cpudata = stats["cpu"]["median"] if stats["cpu"] is not None else None
-        elif self._params["level"] == "strict":
+        elif self._params["level"] == "hard":
             eps = 0.25
             ncpu = self._vminfo["ncpu"]
+            diskdata = stats["disk"]["min"] if stats["disk"] is not None else None
+            nicdata = stats["nic"]["min"] if stats["nic"] is not None else None
+            cpudata = stats["cpu"]["min"] if stats["cpu"] is not None else None
+        elif self._params["level"] == "softer":
+            eps = 0.85
+            ncpu = 1
             diskdata = stats["disk"]["min"] if stats["disk"] is not None else None
             nicdata = stats["nic"]["min"] if stats["nic"] is not None else None
             cpudata = stats["cpu"]["min"] if stats["cpu"] is not None else None
