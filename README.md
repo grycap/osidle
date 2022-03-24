@@ -68,14 +68,19 @@ As a summary, the use cases for this project are
 
 ## Levels of analysis
 
-`osidle` implements a number of different levels of analysis: `loose`, `medium` and `strict`. Using each of the levels, it is possible to obtain more information about the VMs and the infrastructure.
+`osidle` implements a number of different levels of analysis: `softer`, `soft`, `medium` and `hard`. Using each of the levels, it is possible to obtain more information about the VMs and the infrastructure.
 
 The different levels of analysis correspond to the metrics used to evaluate the VMs.
-> The current version of `osidle` only consider different levels of usage for the CPU.
 
-- `loose`: consider that the VM have only 1 core. That means that the usage of the cores is summed up (see discussion).
-- `medium`: consider that the VM has half of the actual amount of cores.
-- `strict`: consider that the VM has the actual amount of cores.
+- The current version of `osidle` consider the following levels of usage for the CPU:
+    - `soft` and `softer`: consider that the VM have only 1 core. That means that the usage of the cores is summed up (see ["Evaluating the CPU"](#evaluating-the-cpu)).
+    - `medium`: consider that the VM has an amount of cores that matches the maximum CPU requested by the VM (see ["Evaluating the CPU"](#evaluating-the-cpu)).
+    - `hard`: consider that the VM has the actual amount of cores.
+
+- For the case of the disk and the network, the current version of `osidle` considers the following levels of usage (see ["Evaluation of idle resources"](#evaluation-of-idle-resources)):
+    - `soft` and `softer`: consider that the epsilon for forward-sharing of data is 0.85.
+    - `medium`: consider that the epsilon for forward-sharing of data is 0.75.
+    - `hard`: consider that the epsilon for forward-sharing of data is 0.5.
 
 > `osidle` also implements an alternate method for evaluation of the VMs, but it is not used in the current version (it is under development).
 
@@ -234,11 +239,19 @@ Some of the options are the next ones:
 * --include-eval-data-graph: include the data used to evaluate the results using an easy to read graph (this option uses unicode charset). The graphs show the percentage of time of the VM in each decile of percentage usage (i.e. 0-10, 10-20, 20-30...). Default: `False`
 * --include-stats: include the statistics of the data series. Default: `False`
     > _Note:_ The stats consists of basic stats: `min`, `max`, `mean`, `median` and `typical deviation`.
-* --level: the hardness of the analysis to consider that a VM is used. Possible values: `loose`, `medium` or `strict`. Default: `loose`
-    > _Note:_ In the `strict` level a VM is considered fully used (i.e. the score of usage in all metrics is 10) if it is using 100% of CPU all the time and it is using 100% of transference and disk (according to the thresholds) all the time.
+* --level: the hardness of the analysis to consider that a VM is used. Possible values: `softer`, `soft`, `medium` or `hard`. Default: `soft`
+    > _Note:_ In the `hard` level a VM is considered fully used (i.e. the score of usage in all metrics is 10) if it is using 100% of CPU all the time and it is using 100% of transference and disk (according to the thresholds) all the time.
 * --custom-file: a file containing custom rules to be used in the analysis. Default: `None`
     > _Note:_ The file contains one line per specific rules to apply to a VM in the format `<vm id>:<command line parameters>`. The command line parameters used to run the application will be considered the default ones, and the parameters passed in the file `--custom-file` option will be added to them.
 * --verbose, --verbose-more, --version, --help, --quiet: are the common well-known flags for many applications. 
+
+#### Levels of analysis
+
+There are 4 levels of analysis:
+- `hard`: this type of analysis is not advised for most common platforms. It considers that a VM is fully used if it is using 100% of CPU all the time and it is using 100% of transference and disk (according to the thresholds) all the time, and considers a low `epsilon` for forward-sharing of data in disk and network analysis.
+- `medium`: This analysis considers that a VM is fully used if it was using 100% of the cores requested at maximum (the recommended amount of cores), and considers a medium `epsilon` for forward-sharing of data in disk and network analysis.
+- `soft`: This analysis considers that a VM is fully used if it was using 100% of a single core. It also considers a high `epsilon` for forward-sharing of data in disk and network analysis, so that the analysis is not too sensitive to the VM's usage. This is the default value.
+- `softer`: Is the same as `soft` but it overweights the maximum score to calculate the overall score. The purpose of this calculation is to reward a specific VM profile: e.g. if a VM was intended for CPU intensive tasks, it will have a higher score in CPU than in other metrics. The same is valid for disk-intensive VMs or network-intensive VMs.
 
 #### Examples
 
@@ -363,3 +376,39 @@ Some of the options of the `osidle-packdb` command are:
 * --database: the database file to use (Default: /var/lib/osidled/osidled.db)
 * --minimize: remove the unneeded data from the entries in the database
 
+## Evaluation of idle resources
+
+Evaluating whether a VM is idle or not is a complex task from the sysadmin's point of view. The only one that knows if the VM is used is the user that is using it. But the sysadmin needs to know if the VM is idle or not to manage the resources better.
+
+> This section pretends not to be a complete guide to evaluating idle resources. It is just a description of how it is done in `osidle`.
+
+`osidle` obtains the information from the data provided by the hypervisor: the accumulated disk, cpu and nic usage of the VM from the last time that it was powered on. To be able to analyze the variations of the usage of the VM, the hypervisor is asked about the resources consumed by each VM, at different times (each 600 seconds by default). Then, the data is linearized by subtracting the previous value from the current one. And this is how `osidle` knows about the fluctuations in the usage of the resources in the time.
+
+### Evaluating the CPU
+Evaluating the CPU may be somehow easy, because it is easy to obtain the percentage of used CPU. Then if we consider a residual amount of CPU dedicated to the processes of the OS, we may estimate the percentage of CPU actually used by the VM.
+
+But this may not be enough by itself, because most VMs have multiple cores and so, the usage of the CPU tend to be very low for most use cases. As an example, consider python applications, which are mostly sequential. A fully used VM will use less than 200% of the CPU (while having 800% available for a 8-core VM). That would mean that the VM is used at less than 25% of its capacity. And if we consider also a low usage of the disk and the network, the VM may be used at less than 10% of its capacity.
+
+Requiring 8 cores in the previous example may be a bad decission of the user who requested the VM. But maybe the user had no choice if the application needed an amount of memory that is not available for flavors with less than 8 cores. In such case, the user was somehow forced to use a VM with 8 cores. So the VM should not be penalized for this.
+
+At the end, strictly speaking, the VM was using 25% of its capacity... _but it is used_. Maybe the sysadmin should create a new flavor with less cores and suggest the user to resize the VM to use it. But the VM should not be a candidate to be powered off.
+
+`osidle` enables to evaluate the CPU usage considering that the VM has a different number of cores. So, depending on the level of analysis, the actual number of cores will be considered as if the VM had a different number of cores:
+- `hard` level: the number of cores is considered as if the VM had the same number of cores as the flavor it was created with.
+- `medium` level: the number of cores is considered as if the VM had the number of cores that matches the amount of CPU requested by the VM in the period of analysis. For example, if the VM had a flavor with 8 cores, and the VM requested a CPU of 2.5, the number of cores will be considered as if the VM had 3 cores.
+- `soft` and `softer` levels: the number of cores is considered as if the VM had 1 single core. So that an aggregated amount of usage of the CPU of more than 100% will be considered as a full usage of the VM.
+
+### Evaluating the disk and the network usage
+Evaluating this kind of resources is more complex than the CPU. While evaluating the CPU had the approach of evaluating the percentage of CPU used, evaluating the disk and the network usage had to consider the amount of data that was transferred and not the percentage of usage of these resources.
+
+Let's focus on the disk, but the analysis is the same for the network. 
+
+`osidle` considers a data rate for the disk (reading and writting), and establishes a threshold that would mean that the VM is "very used" (i.e. the maximum score of disk usage). 
+
+The problem is that a VM may use a lot of disk in a second, just because the disk is very fast. If the disk was slow, it would be also considered as "very used" for a longer time. Then the second VM is being rewarded for its usage of the disk, but not for being used for a longer time. And it happens because of saturation of the threshold.
+
+`osidle` tries to mitigate this kind of unfairness by applying a filter to the transference of data, so that excess of disk usage over the saturation threshold is considered for the next period of analysis in a fraction (called `epsilon` during this document).
+
+## Using `osidle` to re-think the flavors 
+
+TBD
