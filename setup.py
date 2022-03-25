@@ -27,15 +27,12 @@ from osidle.version import VERSION
 
 data_files=[
   # Copy the base configuration file to the global folder
-  ('/etc/osidled/', ['etc/osidled.conf', 'osidle-notify'], ""),
-  ('/etc/rsyslog.d/', ['etc/rsyslog.d/30-osidle.conf'], "syslog:adm"),
-  ('/etc/default', ['etc/osidled.conf'], ""),
+  ('/etc/osidled/', ['etc/osidled.conf', 'osidle-notify'], "", False),
+  ('/etc/default', ['etc/osidled.conf'], "", True),
   # Prepare the service configuration file
-  ('/etc/systemd/system', ['etc/systemd/system/osidled.service'], ""),
+  ('/etc/systemd/system', ['etc/systemd/system/osidled.service'], "", True),
   # Make sure that the working folder for the service is created
-  ('/var/lib/osidled/', [], ""),
-  # Make sure that the log folder for the service is created
-  ('/var/log/osidled/', [], ""),
+  ('/var/lib/osidled/', [], "", False),
 ]
 
 def chown(path, user, recursive=False):
@@ -88,7 +85,7 @@ if __name__ == "__main__":
 
   def copyfiles():
     global data_files, overwriteconfig
-    for folder, files, user in data_files:
+    for folder, files, user, forceoverwrite in data_files:
       # Get the user to change the ownership of the files
       # Create the folder if it does not exist
       if not os.path.exists(folder):
@@ -101,13 +98,13 @@ if __name__ == "__main__":
         if os.path.isdir(configfile):
           # It is a folder... so copy recursively
           dest_folder = os.path.join(folder, file)
-          if overwriteconfig or not os.path.exists(dest_folder):
+          if forceoverwrite or overwriteconfig or not os.path.exists(dest_folder):
             shutil.copytree(configfile, folder)
             chown(dest_folder, user, recursive=True)
         elif os.path.isfile(configfile):
           # It is a file... so copy it
           dest_filename = os.path.join(folder, os.path.basename(file))
-          if overwriteconfig or (not os.path.exists(dest_filename)):
+          if forceoverwrite or overwriteconfig or (not os.path.exists(dest_filename)):
             shutil.copy2(configfile, folder)
             chown(dest_filename, user, recursive=False)
         else:
