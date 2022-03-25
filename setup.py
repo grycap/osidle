@@ -27,13 +27,50 @@ from osidle.version import VERSION
 
 data_files=[
   # Copy the base configuration file to the global folder
-  ('/etc', ['etc/osidled.conf']),
-  ('/etc/default', ['etc/osidled.conf']),
+  ('/etc/osidled/', ['etc/osidled.conf', 'osidle-notify'], ""),
+  ('/etc/rsyslog.d/', ['etc/rsyslog.d/30-osidle.conf'], "syslog:adm"),
+  ('/etc/default', ['etc/osidled.conf'], ""),
   # Prepare the service configuration file
-  ('/etc/systemd/system', ['etc/systemd/system/osidled.service']),
+  ('/etc/systemd/system', ['etc/systemd/system/osidled.service'], ""),
   # Make sure that the working folder for the service is created
-  ('/var/lib/osidled/', [])             
+  ('/var/lib/osidled/', [], ""),
+  # Make sure that the log folder for the service is created
+  ('/var/log/osidled/', [], ""),
 ]
+
+def chown(path, user, recursive=False):
+  if user == "":
+    return
+
+  user_p = user.split(":")
+  user = user_p[0] if user_p[0] != "" else None
+  group = user_p[1] if len(user_p) > 1 else None
+
+  import pwd
+  import grp
+
+  try:
+    uid = pwd.getpwnam(user).pw_uid
+  except KeyError:
+    uid = None
+  
+  try:
+    gid = grp.getgrnam(group).gr_gid
+  except KeyError:
+    gid = None
+
+  try:
+    if not recursive or os.path.isfile(path):
+      shutil.chown(path, user, group)
+    else:
+      for root, dirs, files in os.walk(path):
+        shutil.chown(root, user, group)
+        for item in dirs:
+          shutil.chown(os.path.join(root, item), user, group)
+        for item in files:
+          shutil.chown(os.path.join(root, item), user, group)
+  except OSError as e:
+    raise e 
 
 if __name__ == "__main__":
   import os
@@ -51,23 +88,28 @@ if __name__ == "__main__":
 
   def copyfiles():
     global data_files, overwriteconfig
-    for folder, files in data_files:
+    for folder, files, user in data_files:
+      # Get the user to change the ownership of the files
+      # Create the folder if it does not exist
       if not os.path.exists(folder):
         os.makedirs(folder)
+        chown(folder, user, recursive=False)
       if not os.path.isdir(folder):
         raise Exception("Error: {} is not a directory\n".format(folder))
       for file in files:
         configfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), file)
         if os.path.isdir(configfile):
-          print("es un directorio")
           # It is a folder... so copy recursively
-          if overwriteconfig or not os.path.exists(os.path.join(folder, file)):
+          dest_folder = os.path.join(folder, file)
+          if overwriteconfig or not os.path.exists(dest_folder):
             shutil.copytree(configfile, folder)
-          pass
+            chown(dest_folder, user, recursive=True)
         elif os.path.isfile(configfile):
           # It is a file... so copy it
-          if overwriteconfig or (not os.path.exists(os.path.join(folder, os.path.basename(file)))):
+          dest_filename = os.path.join(folder, os.path.basename(file))
+          if overwriteconfig or (not os.path.exists(dest_filename)):
             shutil.copy2(configfile, folder)
+            chown(dest_filename, user, recursive=False)
         else:
           raise Exception("Error: could not find file {}\n".format(file))            
 

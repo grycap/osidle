@@ -1,0 +1,127 @@
+#!/bin/bash
+#
+#    Copyright 2022 - Carlos A. <https://github.com/dealfonso>
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+#
+function send_an_email() {
+    local FROM_MAIL="adminserver@my.server.com"
+    local MAIL_SERVER=smtp.my.server.com
+    local EMAIL="${2:-adminserver@my.server.com}"
+    local TEXT="$1"
+    local SUBJECT="${3:-[osidle] idle VM detected}"
+
+    # send a copy to the admin
+    echo "$TEXT" | sendEmail -t "$EMAIL" -bcc "$ADMIN_MAIL" -u "$SUBJECT" -s "$MAIL_SERVER" -f "$FROM_MAIL" -o message-charset=utf-8
+}
+
+function vm_url() {
+    while [ $# -gt 0 ]; do
+            echo "https://openstack.my.server.com/horizon/admin/instances/$1/detail"
+            shift
+    done
+}
+
+# These are variables for openstack command
+export OS_PROJECT_DOMAIN_NAME=Default
+export OS_USER_DOMAIN_NAME=Default
+export OS_PROJECT_NAME=admin
+export OS_USERNAME=admin
+export OS_PASSWORD=ADMIN_PASSWORD
+export OS_AUTH_URL=https://openstack.my.server.com:5000/v3
+export OS_IDENTITY_API_VERSION=3
+export OS_IMAGE_API_VERSION=2
+export OS_AUTH_TYPE=password
+
+# Prepare a filename to store the analysis (I want to be unique to keep it)
+TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
+ANALISIS_FNAME="${TIMESTAMP}_osidle.csv"
+
+# Analyze the platform
+osidle --format csv --from 2w -r --sort -O $ANALISIS_FNAME --summarize --under-threshold 1 -q
+if [ "$?" != "0" ]; then
+        send_an_email "an error occurred when executing osidle"
+        exit 1
+fi
+
+# Get the list of VMs which are candidate to be powered off
+MAQUINAS="$(cat "$ANALISIS_FNAME" | tail -n +2 | awk -F',' '{print $1}')"
+
+# Retrieve the list of users in openstack
+_LIST_ID=()
+_LIST_USER=()
+_LIST_EMAIL=()
+n=0
+USERLIST="$(openstack user list -f csv -c ID -c Name -c Email --long | tail -n +2)"
+while IFS=',' read _ID _USER _EMAIL; do
+    _LIST_ID[$n]="${_ID:1:-1}"
+    _LIST_USER[$n]="${_USER:1:-1}"
+    _LIST_EMAIL[$n]="${_EMAIL:1:-1}"
+    n=$((n+1))
+done <<< "$USERLIST"
+
+# Now retrieve the owner for the detected VMs and send an email
+n=0
+_SERVER_IDS=()
+_SERVER_REST=()
+for _ID in $MAQUINAS; do
+    eval "$(openstack server show "$_ID" -f shell)"
+    _USER=$user_id
+    for ((i=0;i<${#_LIST_ID[@]};i++)); do
+        if [ "${_LIST_ID[$i]}" == "$user_id" ]; then
+            _USER="${_LIST_USER[$i]}"
+            _EMAIL="${_LIST_EMAIL[$i]}"
+            break
+        fi
+    done
+
+    eval "$(osidle --format shell -i "$_ID" --full-report -q)"
+    CPU_MEAN="$(echo "$stats_cpu_mean_0 100" | awk '{printf "%f", $1*$2}')"
+    TEXTO="
+Dear user,
+
+We have detected that your VM $_ID has not been idle during the past 2 weeks. The VM was created on $created
+
+The usage profile is the next:
+
+CPU: $cpu_graph_0; mean usage: ${CPU_MEAN}% score: $cpu_score_0/10 (*)
+DISK: $disk_graph_0; score: $disk_score_0/10 (*)
+NETWORK: $nic_graph_0; score: $nic_score_0/10 (*)
+
+(*) the chart represents (from left to right) the time in the period that the VM has been using each resource 0-10%, 10-20%, ..., 90-100%.
+
+Please consider to power off the VM if it is not used, to share the resources with other VMs.
+
+You can check the details of the VM at:
+$(vm_url $_ID)
+
+Thank you for your attention."
+    if [ "$_EMAIL" == "" ]; then
+        TEXTO="
+[user $_ID ($_USER) has not an email set]
+
+$TEXTO"
+    fi
+    send_an_email "$TEXTO" "$_EMAIL"
+done
+
+# Send the summary to the admin
+send_an_email "
+Hi,
+
+some VMs have not been idle during the past 2 weeks:
+
+$(vm_url $MAQUINAS)
+
+Regards"
+```
