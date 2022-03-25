@@ -27,7 +27,8 @@ from osidle.version import VERSION
 
 data_files=[
   # Copy the base configuration file to the global folder
-  ('/etc/osidled/', ['etc/osidled.conf', 'osidle-notify'], "", False),
+  ('/etc/osidled/', ['etc/osidled.conf'], "", False),
+  ('/etc/osidled/', ['etc/osidle-notify'], "", True),
   ('/etc/default', ['etc/osidled.conf'], "", True),
   # Prepare the service configuration file
   ('/etc/systemd/system', ['etc/systemd/system/osidled.service'], "", True),

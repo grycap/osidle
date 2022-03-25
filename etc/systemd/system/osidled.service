@@ -5,7 +5,7 @@ Description=OpenStack VM monitoring for detecting idle VMs
 Type=simple
 
 # If not using "-u" option, the output will be buffered and so the logs won't be obtained in real time; output to stdout (in the journal file) and also to the log file.
-ExecStart=sh -c "/usr/bin/env python3 -u /usr/local/bin/osidled -c /etc/osidled/osidled.conf 2>&1 | tee -a /var/log/osidled.log"
+ExecStart=/bin/sh -c "/usr/bin/env python3 -u /usr/local/bin/osidled -c /etc/osidled/osidled.conf 2>&1 | tee -a /var/log/osidled.log"
 
 # Start in the working folder
 WorkingDirectory=/var/lib/osidled
