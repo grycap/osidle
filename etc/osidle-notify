@@ -32,6 +32,9 @@ function vm_url() {
     done
 }
 
+# Placement for the OSIDLE command
+OSIDLE=/usr/local/bin/osidle
+
 # These are variables for openstack command
 export OS_PROJECT_DOMAIN_NAME=Default
 export OS_USER_DOMAIN_NAME=Default
@@ -45,13 +48,15 @@ export OS_AUTH_TYPE=password
 
 # Prepare a filename to store the analysis (I want to be unique to keep it)
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
+TMPFILE="${TIMESTAMP}_osidle.out"
 ANALISIS_FNAME="${TIMESTAMP}_osidle.csv"
 
 # Analyze the platform
-osidle --format csv --from 2w -r --sort -O $ANALISIS_FNAME --summarize --under-threshold 1 -q
-if [ "$?" != "0" ]; then
-        send_an_email "an error occurred when executing osidle"
-        exit 1
+$OSIDLE --format csv --from 2w -r --sort -O $ANALISIS_FNAME --summarize --under-threshold 1 2>&1 >> "$TMPFILE"
+ERR=$?
+if [ $ERR -ne 0 ]; then
+	send_an_email "$(cat "$TMPFILE")" "" "[osidle] an error occurred when executing osidle ($ERR)"
+	exit 1
 fi
 
 # Get the list of VMs which are candidate to be powered off
@@ -74,8 +79,18 @@ done <<< "$USERLIST"
 n=0
 _SERVER_IDS=()
 _SERVER_REST=()
+_EXISTING=()
+_REMOVED=()
 for _ID in $MAQUINAS; do
-    eval "$(openstack server show "$_ID" -f shell)"
+    VARIABLES="$(openstack server show "$_ID" -f shell)"
+    ERROR=$?
+    if [ $ERROR -ne 0 ]; then
+        # The VM does not exist now. It has been probably deleted
+        _REMOVED=(${_REMOVED[@]} $_ID)
+        continue
+    fi
+    _EXISTING=(${_EXISTING[@]} $_ID)
+    eval "$VARIABLES"
     _USER=$user_id
     for ((i=0;i<${#_LIST_ID[@]};i++)); do
         if [ "${_LIST_ID[$i]}" == "$user_id" ]; then
@@ -85,7 +100,7 @@ for _ID in $MAQUINAS; do
         fi
     done
 
-    eval "$(osidle --format shell -i "$_ID" --full-report -q)"
+    eval "$($OSIDLE --format shell -i "$_ID" --full-report -q)"
     CPU_MEAN="$(echo "$stats_cpu_mean_0 100" | awk '{printf "%f", $1*$2}')"
     TEXTO="
 Dear user,
@@ -121,7 +136,7 @@ Hi,
 
 some VMs have not been idle during the past 2 weeks:
 
-$(vm_url $MAQUINAS)
+$(vm_url ${_EXISTING[@]})
 
 Regards"
 ```
