@@ -14,6 +14,10 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 #
+
+# @param $1 - The body of the email
+# @param $2 - The destination email (optional; default: admin email)
+# @param $3 - The subject of the email (optional; default: [osidle] idle VM detected)])
 function send_an_email() {
     local FROM_MAIL="adminserver@my.server.com"
     local MAIL_SERVER=smtp.my.server.com
@@ -22,7 +26,7 @@ function send_an_email() {
     local SUBJECT="${3:-[osidle] idle VM detected}"
 
     # send a copy to the admin
-    echo "$TEXT" | sendEmail -t "$EMAIL" -bcc "$ADMIN_MAIL" -u "$SUBJECT" -s "$MAIL_SERVER" -f "$FROM_MAIL" -o message-charset=utf-8
+    echo "$TEXT" | sendEmail -t "$EMAIL" -bcc "$FROM_MAIL" -u "$SUBJECT" -s "$MAIL_SERVER" -f "$FROM_MAIL" -o message-charset=utf-8
 }
 
 function vm_url() {
@@ -52,7 +56,7 @@ TMPFILE="${TIMESTAMP}_osidle.out"
 ANALISIS_FNAME="${TIMESTAMP}_osidle.csv"
 
 # Analyze the platform
-$OSIDLE --format csv --from 2w -r --sort -O $ANALISIS_FNAME --summarize --under-threshold 1 2>&1 >> "$TMPFILE"
+$OSIDLE --format csv --from 2w -r --sort -O $ANALISIS_FNAME --summarize --under-threshold 1 -q 2>&1 >> "$TMPFILE"
 ERR=$?
 if [ $ERR -ne 0 ]; then
 	send_an_email "$(cat "$TMPFILE")" "" "[osidle] an error occurred when executing osidle ($ERR)"
@@ -131,7 +135,8 @@ $TEXTO"
 done
 
 # Send the summary to the admin
-send_an_email "
+if [ ${#_EXISTING[@]} -gt 0 ]; then
+    send_an_email "
 Hi,
 
 some VMs have not been idle during the past 2 weeks:
@@ -139,4 +144,4 @@ some VMs have not been idle during the past 2 weeks:
 $(vm_url ${_EXISTING[@]})
 
 Regards"
-```
+fi

@@ -140,6 +140,48 @@ python3 setup.py install
 
 `osidle` has a _monitor_ (i.e. `osidled`) and a command line application (i.e. `osidle`) that can be used to analyze the data. The monitor obtains the information from the OpenStack server and stores it in a database. Later the command line application can be used to analyze the data.
 
+### Quickstart
+
+1. Once installed, update variables `OS_USERNAME`, `OS_PASSWORD` and `OS_AUTH_URL` in `/etc/osidled/osidled.conf` to match the values to access your keystone server.
+
+2. Enable and start the service:
+    ```
+    # systemctl enable osidled.service
+    # systemctl start osidled.service
+    ```
+
+3. Check that it is properly working:
+
+    ```console
+    # systemctl status osidled.service
+    ● osidled.service - OpenStack VM monitoring for detecting idle VMs
+    Loaded: loaded (/etc/systemd/system/osidled.service; disabled; vendor preset: enabled)
+    Active: active (running) since Thu 2022-03-31 09:29:40 UTC; 1min 27s ago
+    Main PID: 29715 (sh)
+        Tasks: 3 (limit: 4915)
+    CGroup: /system.slice/osidled.service
+            ├─29715 /bin/sh -c /usr/bin/env python3 -u /usr/local/bin/osidled -c /etc/osidled/osidled.conf
+            ├─29716 python3 -u /usr/local/bin/osidled -c /etc/osidled/osidled.conf
+            └─29717 tee -a /var/log/osidled.log
+
+    mar 31 09:29:40 menoscloud systemd[1]: Started OpenStack VM monitoring for detecting idle VMs.
+    mar 31 09:29:41 menoscloud sh[29715]: [INFO - 2022-03-31 09:29:41.806591] starting the monitoring loop
+    ```
+4. Use the analysis CLI (*)
+    ```console
+    # osidle --info
+    Information about the data available:
+    - first entry: 2022-03-31 09:29:48.136000
+    - last entry: 2022-03-31 09:49:51.407000
+    - available vms: 1
+    # osidle
+    Processing VMs: 100%|█████████████████████████████████████████████████████| 1/1 [00:00<00:00, 730.33VMs/s]
+    Analyzing the data: 100%|████████████████████████████████████████████████| 1/1 [00:00<00:00, 2685.21VMs/s]
+    {"d6cd045e-355a-42c1-a278-733782e46f12": {"disk": {"score": 10.0, "score2": 10, "graph": "\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2588"}, "nic": {"score": 7.22, "score2": 6.82, "graph": "\u2581\u2581\u2581\u2581\u2581\u2581\u2585\u2584\u2581\u2581"}, "cpu": {"score": 0.0, "score2": 0.61, "cores": 1, "graph": "\u2588\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581\u2581"}, "overall": 5.74}}
+    ```
+
+    (*) it is better to wait a bit to grab some data ;)
+
 ### Monitor (osidled)
 
 The monitor can be run in background mode as a service, using the `systemd` unit file.
@@ -413,137 +455,59 @@ The problem is that a VM may use a lot of disk in a second, just because the dis
 
 TBD
 
-## Real world example
+## Setting up an unattended and automated weekly analysis
 
-Here it is included an script that analyzes the usage of the VMs in a openstack platform, and sends e-mails to the users to warn them about the VMs that are not used.
+To keep your OpenStack deployment tidy, I suggest to create a cron task that automatically detects the idle VMs and sends e-mails to the owners of the idle machines (or to the admin).
 
-The script is called `osidle-notify` and it is included in `/etc/osidled/` folder. In our premises, it is installed in the `/usr/sbin` directory, and it is executed by cron weekly (*) the credentials have to be updated to the openstack deployment.
+`osidle` includes `osidle-notify`, which is an example of bash script that combines `osidle` and `openstack` CLI command to automate this task. The script is located in `/etc/osidle` folder.
 
-```bash
-#!/bin/bash
-#
-#    Copyright 2022 - Carlos A. <https://github.com/dealfonso>
-#
-#    Licensed under the Apache License, Version 2.0 (the "License");
-#    you may not use this file except in compliance with the License.
-#    You may obtain a copy of the License at
-#
-#        http://www.apache.org/licenses/LICENSE-2.0
-#
-#    Unless required by applicable law or agreed to in writing, software
-#    distributed under the License is distributed on an "AS IS" BASIS,
-#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#    See the License for the specific language governing permissions and
-#    limitations under the License.
-#
-function send_an_email() {
+### Installation of automated analysis
+
+1. Copy the script to a folder where it is being ran:
+
+    ```console
+    # cp /etc/osidle/osidle-notify /usr/sbin/
+    ```
+
+2. Adjust the credentials to access to your servers in file `/usr/sbin/osidle-notify` (i.e. the content of the typical `admin-openrc` file created during the installation of OpenStack):
+
+    ```bash
+    # These are variables for openstack command
+    export OS_PROJECT_DOMAIN_NAME=Default
+    export OS_USER_DOMAIN_NAME=Default
+    export OS_PROJECT_NAME=admin
+    export OS_USERNAME=admin
+    export OS_PASSWORD=ADMIN_PASSWORD
+    export OS_AUTH_URL=https://openstack.my.server.com:5000/v3
+    export OS_IDENTITY_API_VERSION=3
+    export OS_IMAGE_API_VERSION=2
+    export OS_AUTH_TYPE=password
+    ```
+
+    and also adjust the parameters for your e-mail server (*):
+
+    ```bash
     local FROM_MAIL="adminserver@my.server.com"
     local MAIL_SERVER=smtp.my.server.com
     local EMAIL="${2:-adminserver@my.server.com}"
-    local TEXT="$1"
-    local SUBJECT="${3:-[osidle] idle VM detected}"
+    ```
 
-    # send a copy to the admin
-    echo "$TEXT" | sendEmail -t "$EMAIL" -bcc "$ADMIN_MAIL" -u "$SUBJECT" -s "$MAIL_SERVER" -f "$FROM_MAIL" -o message-charset=utf-8
-}
+    (*) `osidle-notify` relies on `sendEmail` command. If you prefer to use other mail client, please edit function `send_an_email` in `osidle-notify`.
 
-function vm_url() {
-    while [ $# -gt 0 ]; do
-            echo "https://openstack.my.server.com/horizon/admin/instances/$1/detail"
-            shift
-    done
-}
+3. Edit cron tab 
+    ```console
+    # crontab -e
+    ```
+    and add a line like the next one (*)
+    ```bash
+    00 11 * * 3 cd /var/lib/osidled && /usr/sbin/osidle-notify
+    ```
 
-# These are variables for openstack command
-export OS_PROJECT_DOMAIN_NAME=Default
-export OS_USER_DOMAIN_NAME=Default
-export OS_PROJECT_NAME=admin
-export OS_USERNAME=admin
-export OS_PASSWORD=ADMIN_PASSWORD
-export OS_AUTH_URL=https://openstack.my.server.com:5000/v3
-export OS_IDENTITY_API_VERSION=3
-export OS_IMAGE_API_VERSION=2
-export OS_AUTH_TYPE=password
+    (*) this will run `osidle-notify` in folder `/var/lib/osidled` every wednesday, at 11 am.
 
-# Prepare a filename to store the analysis (I want to be unique to keep it)
-TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-ANALISIS_FNAME="${TIMESTAMP}_osidle.csv"
+    (+) the weekly analysis will be kept in the running folder (in this setup, it is `/var/lib/osidled`). If you do not need them you can safely delete them after each analysis by modifying `osidle-notify`.
 
-# Analyze the platform
-osidle --format csv --from 2w -r --sort -O $ANALISIS_FNAME --summarize --under-threshold 1 -q
-if [ "$?" != "0" ]; then
-        send_an_email "an error occurred when executing osidle"
-        exit 1
-fi
-
-# Get the list of VMs which are candidate to be powered off
-MAQUINAS="$(cat "$ANALISIS_FNAME" | tail -n +2 | awk -F',' '{print $1}')"
-
-# Retrieve the list of users in openstack
-_LIST_ID=()
-_LIST_USER=()
-_LIST_EMAIL=()
-n=0
-USERLIST="$(openstack user list -f csv -c ID -c Name -c Email --long | tail -n +2)"
-while IFS=',' read _ID _USER _EMAIL; do
-    _LIST_ID[$n]="${_ID:1:-1}"
-    _LIST_USER[$n]="${_USER:1:-1}"
-    _LIST_EMAIL[$n]="${_EMAIL:1:-1}"
-    n=$((n+1))
-done <<< "$USERLIST"
-
-# Now retrieve the owner for the detected VMs and send an email
-n=0
-_SERVER_IDS=()
-_SERVER_REST=()
-for _ID in $MAQUINAS; do
-    eval "$(openstack server show "$_ID" -f shell)"
-    _USER=$user_id
-    for ((i=0;i<${#_LIST_ID[@]};i++)); do
-        if [ "${_LIST_ID[$i]}" == "$user_id" ]; then
-            _USER="${_LIST_USER[$i]}"
-            _EMAIL="${_LIST_EMAIL[$i]}"
-            break
-        fi
-    done
-
-    eval "$(osidle --format shell -i "$_ID" --full-report -q)"
-    CPU_MEAN="$(echo "$stats_cpu_mean_0 100" | awk '{printf "%f", $1*$2}')"
-    TEXTO="
-Dear user,
-
-We have detected that your VM $_ID has not been idle during the past 2 weeks. The VM was created on $created
-
-The usage profile is the next:
-
-CPU: $cpu_graph_0; mean usage: ${CPU_MEAN}% score: $cpu_score_0/10 (*)
-DISK: $disk_graph_0; score: $disk_score_0/10 (*)
-NETWORK: $nic_graph_0; score: $nic_score_0/10 (*)
-
-(*) the chart represents (from left to right) the time in the period that the VM has been using each resource 0-10%, 10-20%, ..., 90-100%.
-
-Please consider to power off the VM if it is not used, to share the resources with other VMs.
-
-You can check the details of the VM at:
-$(vm_url $_ID)
-
-Thank you for your attention."
-    if [ "$_EMAIL" == "" ]; then
-        TEXTO="
-[user $_ID ($_USER) has not an email set]
-
-$TEXTO"
-    fi
-    send_an_email "$TEXTO" "$_EMAIL"
-done
-
-# Send the summary to the admin
-send_an_email "
-Hi,
-
-some VMs have not been idle during the past 2 weeks:
-
-$(vm_url $MAQUINAS)
-
-Regards"
-```
+4. The script relies on `sendemail` command, so install it:
+    ```console
+    # apt install -y sendemail
+    ```
