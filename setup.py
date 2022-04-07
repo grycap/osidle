@@ -153,7 +153,6 @@ if __name__ == "__main__":
     cmdclass={
         'install': PostInstallCommand,
         'develop': PostDevelopCommand,
-        'egg_info': PostEggCommand,
     },
     classifiers=[
       'Development Status :: 4 - Beta',      # Chose either "3 - Alpha", "4 - Beta" or "5 - Production/Stable" as the current state of your package
