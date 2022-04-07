@@ -25,6 +25,10 @@ README = (HERE / "README.md").read_text()
 
 from osidle.version import VERSION
 
+# The data files to be installed. The syntax is the same as for the setup(), but in this version
+#   it is possible to chown the files and to force overwritting or not:
+#   ( "destination folder", [ "list of relative filenames or folders to be copied to the destination folder", "user:group" to chown, True/False to force overwritting ] )
+#   - The user:group can be set to "" to not to chown the files, or omit any of them to not to chown the group or the user
 data_files=[
   # Copy the base configuration file to the global folder
   ('/etc/osidled/', ['etc/osidled.conf'], "", False),
@@ -86,7 +90,14 @@ if __name__ == "__main__":
 
   def copyfiles():
     global data_files, overwriteconfig
-    for folder, files, user, forceoverwrite in data_files:
+    for options in data_files:
+      if len(options) < 2:
+        raise Exception("Invalid data file options")
+      if len(options) < 3:
+        options = [ *options, "" ]
+      if len(options) < 4:
+        options = [ *options, False ]
+      [ folder, files, user, forceoverwrite ] = options
       # Get the user to change the ownership of the files
       # Create the folder if it does not exist
       if not os.path.exists(folder):
@@ -121,10 +132,6 @@ if __name__ == "__main__":
       super().run()
       copyfiles()
 
-  class PostEggCommand(egg_info):
-    def run(self):
-      super().run()
-
   setup(
     name = 'osidle',            
     packages = ['osidle'],
@@ -135,7 +142,7 @@ if __name__ == "__main__":
     long_description_content_type = 'text/markdown',
     author = 'Carlos A.',             
     author_email = 'caralla@upv.es',  
-    url = 'https://github.com/dealfonso/osidle',
+    url = 'https://github.com/grycap/osidle',
     keywords = ['openstack', 'idle', 'virtual machine' ],
     install_requires=[
             'dateutils',
