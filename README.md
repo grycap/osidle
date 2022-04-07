@@ -68,17 +68,17 @@ As a summary, the use cases for this project are
 
 ## Levels of analysis
 
-`osidle` implements a number of different levels of analysis: `softer`, `soft`, `medium` and `hard`. Using each of the levels, it is possible to obtain more information about the VMs and the infrastructure.
+`osidle` implements a number of different levels of analysis: `soft`, `medium` and `hard`. Using each of the levels, it is possible to obtain more information about the VMs and the infrastructure.
 
 The different levels of analysis correspond to the metrics used to evaluate the VMs.
 
 - The current version of `osidle` consider the following levels of usage for the CPU:
-    - `soft` and `softer`: consider that the VM have only 1 core. That means that the usage of the cores is summed up (see ["Evaluating the CPU"](#evaluating-the-cpu)).
+    - `soft`: consider that the VM have only 1 core. That means that the usage of the cores is summed up (see ["Evaluating the CPU"](#evaluating-the-cpu)).
     - `medium`: consider that the VM has an amount of cores that matches the maximum CPU requested by the VM (see ["Evaluating the CPU"](#evaluating-the-cpu)).
     - `hard`: consider that the VM has the actual amount of cores.
 
 - For the case of the disk and the network, the current version of `osidle` considers the following levels of usage (see ["Evaluation of idle resources"](#evaluation-of-idle-resources)):
-    - `soft` and `softer`: consider that the epsilon for forward-sharing of data is 0.85.
+    - `soft`: consider that the epsilon for forward-sharing of data is 0.85.
     - `medium`: consider that the epsilon for forward-sharing of data is 0.75.
     - `hard`: consider that the epsilon for forward-sharing of data is 0.5.
 
@@ -283,6 +283,9 @@ Some of the options are the next ones:
     > _Note:_ The stats consists of basic stats: `min`, `max`, `mean`, `median` and `typical deviation`.
 * --level: the hardness of the analysis to consider that a VM is used. Possible values: `softer`, `soft`, `medium` or `hard`. Default: `soft`
     > _Note:_ In the `hard` level a VM is considered fully used (i.e. the score of usage in all metrics is 10) if it is using 100% of CPU all the time and it is using 100% of transference and disk (according to the thresholds) all the time.
+* --overall: when a VM is evaluated according to different categories (i.e. CPU, disk and/or NIC), this setting determines how to calculate the final evaluation. The possible values are `mean` (defalut), `max` and `weighted`. 
+    > _Note:_ The purpose of this calculation is to reward a specific VM profile: e.g. if a VM was intended for CPU intensive tasks, it will have a higher score in CPU than in other metrics. The same is valid for disk-intensive VMs or network-intensive VMs. In the case of `mean`, the value is the mean of the single values, but using `weighted`, the maximum score is overweighted to calculate the mean. Finally, `max` sets the overall value to the maximum score in either category.
+
 * --custom-file: a file containing custom rules to be used in the analysis. Default: `None`
     > _Note:_ The file contains one line per specific rules to apply to a VM in the format `<vm id>:<command line parameters>`. The command line parameters used to run the application will be considered the default ones, and the parameters passed in the file `--custom-file` option will be added to them.
 * --verbose, --verbose-more, --version, --help, --quiet: are the common well-known flags for many applications. 
@@ -293,7 +296,6 @@ There are 4 levels of analysis:
 - `hard`: this type of analysis is not advised for most common platforms. It considers that a VM is fully used if it is using 100% of CPU all the time and it is using 100% of transference and disk (according to the thresholds) all the time, and considers a low `epsilon` for forward-sharing of data in disk and network analysis.
 - `medium`: This analysis considers that a VM is fully used if it was using 100% of the cores requested at maximum (the recommended amount of cores), and considers a medium `epsilon` for forward-sharing of data in disk and network analysis.
 - `soft`: This analysis considers that a VM is fully used if it was using 100% of a single core. It also considers a high `epsilon` for forward-sharing of data in disk and network analysis, so that the analysis is not too sensitive to the VM's usage. This is the default value.
-- `softer`: Is the same as `soft` but it overweights the maximum score to calculate the overall score. The purpose of this calculation is to reward a specific VM profile: e.g. if a VM was intended for CPU intensive tasks, it will have a higher score in CPU than in other metrics. The same is valid for disk-intensive VMs or network-intensive VMs.
 
 #### Examples
 
@@ -438,7 +440,7 @@ At the end, strictly speaking, the VM was using 25% of its capacity... _but it i
 `osidle` enables to evaluate the CPU usage considering that the VM has a different number of cores. So, depending on the level of analysis, the actual number of cores will be considered as if the VM had a different number of cores:
 - `hard` level: the number of cores is considered as if the VM had the same number of cores as the flavor it was created with.
 - `medium` level: the number of cores is considered as if the VM had the number of cores that matches the amount of CPU requested by the VM in the period of analysis. For example, if the VM had a flavor with 8 cores, and the VM requested a CPU of 2.5, the number of cores will be considered as if the VM had 3 cores.
-- `soft` and `softer` levels: the number of cores is considered as if the VM had 1 single core. So that an aggregated amount of usage of the CPU of more than 100% will be considered as a full usage of the VM.
+- `soft` level: the number of cores is considered as if the VM had 1 single core. So that an aggregated amount of usage of the CPU of more than 100% will be considered as a full usage of the VM.
 
 ### Evaluating the disk and the network usage
 Evaluating this kind of resources is more complex than the CPU. While evaluating the CPU had the approach of evaluating the percentage of CPU used, evaluating the disk and the network usage had to consider the amount of data that was transferred and not the percentage of usage of these resources.

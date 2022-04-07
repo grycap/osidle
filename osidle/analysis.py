@@ -131,7 +131,8 @@ def osidle_analysis():
     parser.add_argument("--threshold-nic", dest="threshold_nic", help="threshold for the nic usage (in units/second); accepts suffix B, K, M, G (default is Bytes)", type=str, default="4K")
     parser.add_argument("-f", "--format", dest="format", help="output format", choices = ["json", "csv", "excel", "shell"], default="json")
     parser.add_argument("-p", "--pretty", dest="pretty", help="pretty print the output", action="store_true", default=False)
-    parser.add_argument("-l", "--level", dest="level", help="level of detail severity for the analysis", choices = ["hard", "medium", "soft", "softer"], default="soft")
+    parser.add_argument("-l", "--level", dest="level", help="level of detail severity for the analysis", choices = ["hard", "medium", "soft"], default="soft")
+    parser.add_argument("--overall", dest="overall", help="how to calculate the overall value: mean, max or weighted mean", choices = ["mean", "weighted", "max"], default="mean")
     parser.add_argument("-S", "--summarize", dest="summarize", help="summarize the usage for the VMs", action="store_true", default=False)
     parser.add_argument("-U", "--under-threshold", dest="threshold_summarize", help="summary will show only VMs under this threshold of puntuation (from 0 to 10)", type=int, default=3)
     parser.add_argument("-o", "--sort", dest="sort", help="Sort the output descending by estimated usage of the VM", action="store_true", default=False)
@@ -380,11 +381,14 @@ def osidle_analysis():
             continue
 
         # In the "softer" mode, we overweight the maxium score, so that the VM profile is taken into account
-        if args.level == "softer":
+        if args.overall == "mean":
+            overall = round(sum(scores) / len(scores), 2) if len(scores) > 0 else 0
+        elif args.overall == "max":
+            overall = max(scores) if len(scores) > 0 else 0
+        elif args.overall == "weighted":
             if len(scores) > 0:
                 scores = [ *scores, max(scores)]
-
-        overall = round(sum(scores) / len(scores), 2) if len(scores) > 0 else 0
+            overall = round(sum(scores) / len(scores), 2) if len(scores) > 0 else 0
 
         # If wanted to dump the stats, add them to the evaluation
         if args.include_stats:
