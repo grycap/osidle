@@ -132,6 +132,9 @@ class RawData:
                 continue
             if "itemNotFound" in d:
                 continue
+            if (not 'cpu_details' in d) or (not 'disk_details' in d) or (not 'nic_details' in d):
+                p_warning("Missing information in the sample: {}".format(json.dumps(d)))
+                continue
 
             d["tcpu"] = sum(x["time"] for x in d["cpu_details"]) * 1e-9
             d["tdisk"] = sum([ x["read_bytes"] + x["write_bytes"] for x in d["disk_details"] ])
