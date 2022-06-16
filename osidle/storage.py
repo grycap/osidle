@@ -197,7 +197,7 @@ class Storage:
             if data is not None:
                 cursor2.execute("update vmmonitor set data = ? where id = ?", (json.dumps(data), id))
             else:
-                cursor2.execute("delete from vmmonitor where id = ?", (id))
+                cursor2.execute("delete from vmmonitor where id = ?", (id, ))
 
         self._conn.commit()
 
