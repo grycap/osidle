@@ -196,6 +196,8 @@ class Storage:
             data = filter_fnc(vmid, t, data)
             if data is not None:
                 cursor2.execute("update vmmonitor set data = ? where id = ?", (json.dumps(data), id))
+            else:
+                cursor2.execute("delete from vmmonitor where id = ?", (id))
 
         self._conn.commit()
 
@@ -205,10 +207,8 @@ class Storage:
         return True
 
 def remove_unneeded_data(data):
-    if 'conflictingRequest' in data:
-        return data
-    if 'itemNotFound' in data:
-        return data
+    if ('cpu_details' not in data) or ('disk_details' not in data) or ('nic_details' not in data):
+        return None
         
     return {
         "cpu_details": [ { "time": x["time"] } for x in data["cpu_details"] ],

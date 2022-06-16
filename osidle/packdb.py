@@ -7,6 +7,8 @@ import os
 import datetime
 from tqdm import tqdm
 
+# TODO: add an option to remove malformed data (i.e. entries that do not have "cpu_details", "disk_details" and "nic_details")
+
 def osidle_packdb():
     parser = argparse.ArgumentParser(allow_abbrev=False)
 
