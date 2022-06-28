@@ -115,22 +115,38 @@ class Token:
     def token(self):
         return self._token
 
-def getServers(token):
-    # Gets the information regarding to the servers, using the provided token
+def tokenQuery(token, query, headers = {}, timeout = 5):
+    # Performs a query using the provided token
     # @param token: the token to use
-    # @return: a list of dictionaries, each one containing the information about a server or None if an error happened
+    # @param query: the query to perform
     if not token.renewIfNeeded():
         p_error("could not get a valid token")
         return None
-
     try:
-        servers_req = requests.get(token.url + "/servers?all_tenants=1", headers = {'X-Auth-Token': token.token }, timeout = 5)
+        query = query.lstrip("/")
+        req = requests.get(f"{token.url}/{query}", headers = {**headers, 'X-Auth-Token': token.token }, timeout = timeout)
     except Exception as e:
         print(e)
         p_error("Could not connect to OpenStack")
         return None
 
-    servers = servers_req.json()
+    return req.json()
+
+def autoQuery(query, headers = {}):
+    # Performs a query using a token obtained from the environment variables
+    # @param query: the query to perform
+    token = Token()
+    if not token.get():
+        return None
+    return tokenQuery(token, query, headers)
+
+def getServers(token):
+    # Gets the information regarding to the servers, using the provided token
+    # @param token: the token to use
+    # @return: a list of dictionaries, each one containing the information about a server or None if an error happened
+    servers = tokenQuery(token, "/servers?all_tenants=1")
+    if servers is None:
+        return None
     return servers["servers"]
 
 def getServerInfo(token, id):
@@ -138,17 +154,7 @@ def getServerInfo(token, id):
     # @param token: the token to use
     # @param id: the id of the server
     # @return: a json object containing the information about the server or None if an error happened
-    if not token.renewIfNeeded():
-        p_error("could not get a valid token")
-        return None
-
-    try:
-        serverinfo_req = requests.get("{}/servers/{}/diagnostics".format(token.url, id), headers = {'X-Auth-Token': token.token , "X-OpenStack-Nova-API-Version": "2.48"}, timeout = 15)
-    except:
-        p_error("Could not connect to OpenStack")
-        return None
-
-    return serverinfo_req.json()
+    return tokenQuery(token, f"/servers/{id}/diagnostics", headers = {"X-OpenStack-Nova-API-Version": "2.48"}, timeout = 15)
 
 def checkConnection(token):
     # Checks if the token is still valid
