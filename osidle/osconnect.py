@@ -124,7 +124,10 @@ def tokenQuery(token, query, headers = {}, timeout = 5):
         return None
     try:
         query = query.lstrip("/")
-        req = requests.get(f"{token.url}/{query}", headers = {**headers, 'X-Auth-Token': token.token }, timeout = timeout)
+        if (query.startswith("https://") or query.startswith("http://")):
+            req = requests.get(f"{query}", headers = {**headers, 'X-Auth-Token': token.token }, timeout = timeout)
+        else:
+            req = requests.get(f"{token.url}/{query}", headers = {**headers, 'X-Auth-Token': token.token }, timeout = timeout)
     except Exception as e:
         print(e)
         p_error("Could not connect to OpenStack")
