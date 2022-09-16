@@ -32,10 +32,13 @@ from osidle.version import VERSION
 data_files=[
   # Copy the base configuration file to the global folder
   ('/etc/osidled/', ['etc/osidled.conf'], "", False),
+  ('/etc/osidled/', ['etc/osidled-virsh.conf'], "", False),
   ('/etc/osidled/', ['etc/osidle-notify'], "", True),
   ('/etc/default', ['etc/osidled.conf'], "", True),
+  ('/etc/default', ['etc/osidled-virsh.conf'], "", True),
   # Prepare the service configuration file
   ('/etc/systemd/system', ['etc/systemd/system/osidled.service'], "", True),
+  ('/etc/systemd/system', ['etc/systemd/system/osidled-virsh.service'], "", True),
   # Make sure that the working folder for the service is created
   ('/var/lib/osidled/', [], "", False),
 ]

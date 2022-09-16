@@ -1,1 +1,3 @@
 include etc/osidle-notify
+include etc/osidled-virsh.conf
+include etc/systemd/system/osidled-virsh.service

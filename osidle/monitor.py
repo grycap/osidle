@@ -336,7 +336,7 @@ def osidle_monitor_virsh():
             p_error("failed to read configuration file")
             exit(1)
     else:
-        (configfiles, configuration) = config.read([ "./osidled.conf", "/etc/osidle/osidled.conf", "/etc/osidled.conf", "/etc/default/osidled.conf" ], False)
+        (configfiles, configuration) = config.read([ "./osidled-virsh.conf", "/etc/osidle/osidled-virsh.conf", "/etc/osidled-virsh.conf", "/etc/default/osidled-virsh.conf", "./osidled.conf", "/etc/osidle/osidled.conf", "/etc/osidled.conf", "/etc/default/osidled.conf" ], False)
 
     configuration = configuration["DEFAULT"]
     parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
