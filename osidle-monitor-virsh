@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 #
 #    Copyright 2022 - Carlos A. <https://github.com/dealfonso>
 #
@@ -13,4 +14,6 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 #
-VERSION="1.2.0"
+if __name__ == "__main__":
+    from osidle.monitor import osidle_monitor_virsh
+    osidle_monitor_virsh()

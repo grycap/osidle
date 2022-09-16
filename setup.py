@@ -148,7 +148,8 @@ if __name__ == "__main__":
             'dateutils',
             'requests',
             'tqdm',
-            'xlsxwriter'
+            'xlsxwriter',
+            'paramiko'
         ],
     cmdclass={
         'install': PostInstallCommand,
