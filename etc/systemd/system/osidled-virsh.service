@@ -1,0 +1,14 @@
+[Unit]
+Description=VM monitoring for detecting idle VMs in a cluster, using virsh
+
+[Service]
+Type=simple
+
+# If not using "-u" option, the output will be buffered and so the logs won't be obtained in real time; output to stdout (in the journal file) and also to the log file.
+ExecStart=/bin/sh -c "/usr/bin/env python3 -u /usr/local/bin/osidled-virsh -c /etc/osidled/osidled-virsh.conf 2>&1 | tee -a /var/log/osidled-virsh.log"
+
+# Start in the working folder
+WorkingDirectory=/var/lib/osidled
+
+[Install]
+WantedBy=multi-user.target
