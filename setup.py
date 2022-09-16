@@ -166,7 +166,7 @@ if __name__ == "__main__":
       'console_scripts' : [
         'osidle=osidle.analysis:osidle_analysis',
         'osidled=osidle.monitor:osidle_monitor',
-        'osidled-virsh=osidle.monitor:osidle_monitor_virsh'
+        'osidled-virsh=osidle.monitor:osidle_monitor_virsh',
         'osidle-packdb=osidle.packdb:osidle_packdb',
       ]
     },
