@@ -28,6 +28,7 @@ import argparse
 from .configuration import Configuration
 import os 
 from .version import VERSION
+from .explodestring import RangeExploder
 
 # The main loop interval (in seconds, 1 second is fine)
 MAIN_LOOP_INTERVAL = 1
@@ -288,7 +289,7 @@ def osidle_monitor_virsh():
                 # Comma separated list of hostnames whose VMs are to be monitored
                 "HOSTNAMES": "",
                 # The commandline to use to obtain the stats of the domains in one host. Please include {hostname} where the name of the host should be included in the commandline
-                "VIRSH_DOMSTAT": 'virsh -c qemu+ssh://root@{hostname}/system?socket=/var/run/libvirt/libvirt-sock domstats --raw --list-running',
+                "VIRSH_DOMSTAT": ("", lambda x: 'virsh -c qemu+ssh://{hostname}/system domstats --raw --list-running' if x == "" else x),
                 # The amount of hosts to monitor at once (default: 5)
                 "MONITORING_BLOCKSIZE": 5,
                 # The amount of time that can be dedicated to monitor a block of Hosts (default: 5 seconds)
@@ -336,7 +337,9 @@ def osidle_monitor_virsh():
             p_error("failed to read configuration file")
             exit(1)
     else:
-        (configfiles, configuration) = config.read([ "./osidled-virsh.conf", "/etc/osidle/osidled-virsh.conf", "/etc/osidled-virsh.conf", "/etc/default/osidled-virsh.conf", "./osidled.conf", "/etc/osidle/osidled.conf", "/etc/osidled.conf", "/etc/default/osidled.conf" ], False)
+        # TODO: revise: when multiple configuration files, get the value from left to right in precedence
+        # TODO: revise folder osidle/osidled to match setup.py
+        (configfiles, configuration) = config.read([ "./osidled-virsh.conf", "/etc/osidle/osidled-virsh.conf", "/etc/osidled-virsh.conf", "/etc/default/osidled-virsh.conf", "./osidled.conf", "/etc/osidle/osidled.conf", "/etc/osidled.conf", "/etc/default/osidled.conf" ], True)
 
     configuration = configuration["DEFAULT"]
     parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
@@ -375,8 +378,14 @@ def osidle_monitor_virsh():
     storage = Storage(args.database)
     storage.connect()
 
+                
     # Prepare the monitor
-    monitor = MonitorClusterSSH(storage, hostnames = [ x for x in map(lambda x: x.strip(), args.hostnames.split(",")) if x != "" ], frontEndHostname = args.frontend_hostname, 
+    rangeExploder = RangeExploder()
+    hostnames = rangeExploder.parse(args.hostnames)
+    hostnames = list(dict.fromkeys(hostnames))
+    
+    p_debug(f"monitoring {', '.join(hostnames)}")
+    monitor = MonitorClusterSSH(storage, hostnames = hostnames, frontEndHostname = args.frontend_hostname, 
         frontEndUsername=args.frontend_username, frontEndPrivateKey=args.frontend_pkey, virshDomstatsCommand=args.virshDomstats)
 
     if not monitor.check():
