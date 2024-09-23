@@ -205,6 +205,36 @@ class Storage:
             post_fnc()
 
         return True
+    
+    def filterdata_to(self, filter_fnc, pre_fnc = None, post_fnc = None, other_storage = None):
+        if (other_storage is None) or (not other_storage.isConnected()):
+            return False
+        
+        if not self.isConnected():
+            return False
+        
+        cursor1 = self._conn.cursor()
+        cursor2 = other_storage._conn.cursor()
+
+        _sql(cursor1, "select count(*) from vmmonitor")
+        count = cursor1.fetchone()[0]
+
+        if (callable(pre_fnc)):
+            pre_fnc(count)
+
+        _sql(cursor1, "select id, vmid, t, data from vmmonitor")
+        for (id, vmid, t, data) in cursor1:
+            data = json.loads(data)
+            data = filter_fnc(vmid, t, data)
+            if data is not None:
+                cursor2.execute("insert into vmmonitor (vmid, t, data) values (?, ?, ?)", (vmid, t, json.dumps(data)))
+
+        other_storage._conn.commit()
+
+        if (callable(post_fnc)):
+            post_fnc()
+
+        return True
 
 def remove_unneeded_data(data):
     if ('cpu_details' not in data) or ('disk_details' not in data) or ('nic_details' not in data):
@@ -212,11 +242,11 @@ def remove_unneeded_data(data):
         
     return {
         "cpu_details": [ { "time": x["time"] } for x in data["cpu_details"] ],
-        "disk_details": [ { "read_bytes": x["read_bytes"],  "write_bytes": x["write_bytes"]} for x in data["disk_details"] ],
-        "nic_details": [ { "mac_address": x["mac_address"], "rx_octets": x["rx_octets"], "tx_octets": x["tx_octets"] } for x in data["nic_details"] ],
-        "num_cpus": data["num_cpus"],
-        "num_disks": data["num_disks"],
-        "num_nics": data["num_nics"],
-        "uptime": data["uptime"],
-        "state": data["state"],
+        "disk_details": [ { "read_bytes": x["read_bytes"] if "read_bytes" in x else 0,  "write_bytes": x["write_bytes"] if "write_bytes" in x else 0 } for x in data["disk_details"] ],
+        "nic_details": [ { "mac_address": x["mac_address"], "rx_octets": x["rx_octets"], "tx_octets": x["tx_octets"] } for x in data["nic_details"] if "mac_address" in x ],
+        "num_cpus": data["num_cpus"] if "num_cpus" in data else 0,
+        "num_disks": data["num_disks"] if "num_disks" in data else 0,
+        "num_nics": data["num_nics"] if "num_nics" in data else 0,
+        "uptime": data["uptime"] if "uptime" in data else 0,
+        "state": data["state"] if "state" in data else "unknown",
     }

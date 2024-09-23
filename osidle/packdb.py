@@ -23,9 +23,11 @@ def osidle_packdb():
     parser.add_argument("-v", "--verbose", dest="verbose", help="verbose", action="store_true", default=False)
     parser.add_argument("-vv", "--verbose-more", dest="verbosemore", help="verbose more", action="store_true", default=False)
     parser.add_argument("-m", "--minimize", dest="minimize", help="minimize the entries in the database", action="store_true", default=False)
+    parser.add_argument("-M", "--minimize-to", dest="minimizeto", help="minimize the entries in the database to another database (this action happens after any other action, e.g. removing data)", default=None)
     parser.add_argument('--version', action='version', version=VERSION)
 
     args = parser.parse_args()
+    need_vaccuum = False
 
     if not args.quiet:
         if args.verbose:
@@ -102,6 +104,7 @@ def osidle_packdb():
 
     if (args.keepfromdate is not None) or (args.keeptodate is not None):
         rows = storage.delete(args.keepfromdate, args.keeptodate)
+        need_vaccuum = True
         p_info("{} rows deleted".format(rows))
 
     def prefilter(rowcount):
@@ -123,9 +126,34 @@ def osidle_packdb():
 
     if args.minimize:
         storage.filterdata(filterdata, prefilter, postfilter)
+        need_vaccuum = True
+    else:
+        if args.minimizeto is not None:
+            overwrite_destination = False
+            if os.path.exists(args.minimizeto) and args.force:
+                p_debugv("forcing overwriting destination database")
+                overwrite_destination = True
+            
+            if os.path.exists(args.minimizeto) and not args.force:
+                overwrite_destination = user_yes_no_query("destination database already exists. Overwrite it?", "n")
 
-    storage.vaccuum()
-    p_info("database vaccuumed")
+            if os.path.exists(args.minimizeto) and not overwrite_destination:
+                p_error("not overwritting destination database")
+                sys.exit(1)
+
+            p_info("minimizing database to file {}".format(args.minimizeto))
+
+            dest_storage = Storage(args.minimizeto)
+            dest_storage.connect()
+
+            storage.filterdata_to(filterdata, prefilter, postfilter, dest_storage)
+            # dest_storage.vaccuum()
+            p_info("database minimized to file {}".format(args.minimizeto))
+
+    if need_vaccuum:
+        storage.vaccuum()
+        p_info("database vaccuumed")
+
     try:
         pass
     except Exception as e:
