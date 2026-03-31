@@ -83,12 +83,23 @@ class Storage:
             # Just in case the DB is not initialized
             return None
 
-    def savevm(self, vmid, info):
+    def savevm(self, vmid, info, t = None):
         if not self.isConnected():
             return False
 
         cursor = self._conn.cursor()
-        cursor.execute("insert into vmmonitor (vmid, data) values (?, ?)", (vmid, json.dumps(info)))
+        if t is not None:
+            # if t is integer, convert it to datetime
+            if isinstance(t, int) or isinstance(t, float):
+                t = datetime.fromtimestamp(t)
+            if isinstance(t, datetime):
+                t = t.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            if not isinstance(t, str):
+                p_error("t should be a datetime object, a timestamp or a string in the format %Y-%m-%dT%H:%M:%S.%fZ")
+                return False
+            cursor.execute("insert into vmmonitor (vmid, t, data) values (?, ?, ?)", (vmid, t, json.dumps(info)))
+        else:
+            cursor.execute("insert into vmmonitor (vmid, data) values (?, ?)", (vmid, json.dumps(info)))
         self._conn.commit()
         return True
 

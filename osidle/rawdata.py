@@ -54,9 +54,14 @@ class RawData:
             lines = []
             for d in self._data:
                 v = (d["T"], d["S"], d["e"], 
-                    d["tcpu"], d["tdisk"], d["tnic"],
-                    *d["cpu"], *[ v for x in d["disk"] for v in [ x["r"], x["w"] ] ] , # The CPUs
-                    *[ v for x in d["nic"] for v in [ x["rx"], x["tx"] ] ]) # The NICs  
+                    d["tcpu"], d["tdisk"], d["tnic"])
+                try:
+                    v = v + (
+                        *d["cpu"], *[ v for x in d["disk"] for v in [ x["r"], x["w"] ] ] , # The CPUs
+                        *[ v for x in d["nic"] for v in [ x["rx"], x["tx"] ] ]) # The NICs  
+                except Exception as e:
+                    v = v + (0, 0, 0) # The CPUs, DISKs and NICs
+
                 if callable(transform_fnc):
                     v = transform_fnc(v)
                 lines.append(v)

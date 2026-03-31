@@ -189,6 +189,10 @@ class DataSeries:
             "threshold_disk": args.threshold_disk,
             "threshold_nic": args.threshold_nic,
             "level": args.level,
+            "epsilon_softer": args.epsilon_softer if hasattr(args, 'epsilon_softer') else 0.85,
+            "epsilon_soft": args.epsilon_soft if hasattr(args, 'epsilon_soft') else 0.85,
+            "epsilon_medium": args.epsilon_medium if hasattr(args, 'epsilon_medium') else 0.75,
+            "epsilon_hard": args.epsilon_hard if hasattr(args, 'epsilon_hard') else 0.25,
         }
 
         # Now convert the data into a format ready to be analyzed (frequency, cpu (seconds/second), disk (bytes/second), nic(bytes/second))
@@ -220,27 +224,27 @@ class DataSeries:
 
 
     def _evaluate_stats(self, stats):
-        eps = 0.75
+        eps = 0
         if self._params["level"] == "medium":
-            eps = 0.75
+            eps = self._params["epsilon_medium"]
             ncpu = max(math.ceil(stats["cpu"]["max"]) if stats["cpu"] is not None else 1, 1)
             diskdata = stats["disk"]["median"] if stats["disk"] is not None else None
             nicdata = stats["nic"]["median"] if stats["nic"] is not None else None
             cpudata = stats["cpu"]["median"] if stats["cpu"] is not None else None
         elif self._params["level"] == "hard":
-            eps = 0.25
+            eps = self._params["epsilon_hard"]
             ncpu = self._vminfo["ncpu"]
             diskdata = stats["disk"]["min"] if stats["disk"] is not None else None
             nicdata = stats["nic"]["min"] if stats["nic"] is not None else None
             cpudata = stats["cpu"]["min"] if stats["cpu"] is not None else None
         elif self._params["level"] == "softer":
-            eps = 0.85
+            eps = self._params["epsilon_softer"]
             ncpu = 1
             diskdata = stats["disk"]["min"] if stats["disk"] is not None else None
             nicdata = stats["nic"]["min"] if stats["nic"] is not None else None
             cpudata = stats["cpu"]["min"] if stats["cpu"] is not None else None
         else:
-            eps = 0.85
+            eps = self._params["epsilon_soft"]
             ncpu = 1
             diskdata = stats["disk"]["mean"] if stats["disk"] is not None else None
             nicdata = stats["nic"]["mean"] if stats["nic"] is not None else None

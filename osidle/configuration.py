@@ -22,7 +22,13 @@ class Configuration:
         self._defaultvalues = defaultvalues
         self._reader = configparser.ConfigParser()
 
-    def read(self, filename, onlyfirst = False, allownodefault = False):
+    def read(self, filename, onlyfirst = False, allownodefault = False, forcedefaults = True):
+        """
+        @param filename: the configuration file to read; it can be a string with the name of the file or an array of strings with the names of the files to read; if it is an array, all the files will be read but if onlyfirst is True, only the first one will be read
+        @param onlyfirst: if True, only the first file in the array of filenames will be read; if False, all the files in the array of filenames will be read
+        @param allownodefault: if True, if there is a key in the configuration file that is not in the default values, it will be added to the result; if False, only the keys in the default values will be added to the result
+        @param forcedefaults: if True, the default values will be added to the result even if they are not in the configuration file; if False, only the keys in the configuration
+        """
         filesread = []
 
         # if filename is not an array, convert it to an array
@@ -41,6 +47,8 @@ class Configuration:
         _result = {}
         for section, secconfig in self._defaultvalues.items():
             if section not in self._reader:
+                if forcedefaults:
+                    _result[section] = secconfig
                 continue
             if section not in _result:
                 _result[section] = {}

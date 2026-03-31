@@ -26,6 +26,7 @@ import argparse
 import os
 import xlsxwriter
 import math
+from .configuration import Configuration
 
 def dataset_to_barchart(data, lower = None, upper = None):
 
@@ -114,8 +115,51 @@ class OutputFile:
         self.f.close()
 
 def osidle_analysis():
-    parser = argparse.ArgumentParser(allow_abbrev=False)
+    config = Configuration({
+            "DEFAULT": {
+                # Comma separated list of hostnames whose VMs are to be monitored
+                "HOSTNAMES": "",
+            },
+            "ANALYSIS": {
+                # Name of the analysis level (softer, soft, medium, hard); this is just for information and to be used in the notification messages, but it does not change the behaviour of the monitor; if you want to change the behaviour, you should change the thresholds or the way to calculate the score (default: "soft")
+                "LEVEL": "soft",
+                # The threshold for the disk usage (in units/second); accepts suffix B, K, M, G (default is Bytes). The concept is
+                # that if the disk is over this threshold, it is considered that the VM is using it heavily
+                "THRESHOLD_DISK": "4K",
+                # The threshold for the nic usage (in units/second); accepts suffix B, K, M, G (default is Bytes). The concept is
+                # that if the nic is over this threshold, it is considered that the VM is using it heavily
+                "THRESHOLD_NIC": "4K",
+                "EPSILON_SOFTER": 0.85,
+                "EPSILON_SOFT": 0.85,
+                "EPSILON_MEDIUM": 0.75,
+                "EPSILON_HARD": 0.25,
+            }
+            # osidle -i 176b84ae-00ef-4e5d-ba3e-1c71250e9712 -f csv --from 2w --pretty --full-report --no-cpu --no-network --level hard --threshold-disk 1M
+        }
+    )
 
+    parser = argparse.ArgumentParser(allow_abbrev=False, add_help=False, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("-c", "--config", default=None, dest="configurationfile", help = "Use this configuration file")
+
+    configargs, _ = parser.parse_known_args()
+
+    if configargs.configurationfile is not None:
+        (configfiles, configuration) = config.read([ configargs.configurationfile ])
+        if len(configfiles) == 0:
+            p_error("failed to read configuration file")
+            exit(1)
+    else:
+        # TODO: revise: when multiple configuration files, get the value from left to right in precedence
+        # TODO: revise folder osidle/osidled to match setup.py
+        (configfiles, configuration) = config.read([ "./osidled-virsh.conf", "/etc/osidle/osidled-virsh.conf", "/etc/osidled-virsh.conf", "/etc/default/osidled-virsh.conf", "./osidled.conf", "/etc/osidle/osidled.conf", "/etc/osidled.conf", "/etc/default/osidled.conf" ], True)
+
+    print("Configuration files read: {}".format(configfiles))
+    print("Using configuration: {}".format(configuration))
+    configuration = configuration["ANALYSIS"]
+
+    # parser = argparse.ArgumentParser(allow_abbrev=False)
+
+    parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
     parser.add_argument("-q", "--quiet", action="store_true" , help="use the quiet mode (suppress any output except from the resulting analysis, either from the file or stdout)", default=False, dest="quiet")
     parser.add_argument("-r", "--remove-unknown", action="store_true" , help="remove VMs without valid data in the interval", default=False, dest="removeunknown")
     parser.add_argument("-O", "--output", dest="outputfile", default="-", help="output to this file (default: stdout)", type=str)
@@ -127,11 +171,11 @@ def osidle_analysis():
     parser.add_argument("-C", "--no-cpu", dest="analysis_cpu", help="do not consider CPU usage for the analysis", action="store_false", default=True)
     parser.add_argument("-D", "--no-disk", dest="analysis_disk", help="do not consider DISK usage for the analysis", action="store_false", default=True)
     parser.add_argument("-N", "--no-network", dest="analysis_nic", help="do not consider NETWORK usage for the analysis", action="store_false", default=True)
-    parser.add_argument("--threshold-disk", dest="threshold_disk", help="threshold for the disk usage (in units/second); accepts suffix B, K, M, G (default is Bytes)", type=str, default="4K")
-    parser.add_argument("--threshold-nic", dest="threshold_nic", help="threshold for the nic usage (in units/second); accepts suffix B, K, M, G (default is Bytes)", type=str, default="4K")
+    parser.add_argument("--threshold-disk", dest="threshold_disk", help="threshold for the disk usage (in units/second); accepts suffix B, K, M, G (default is Bytes)", type=str, default=configuration["THRESHOLD_DISK"])
+    parser.add_argument("--threshold-nic", dest="threshold_nic", help="threshold for the nic usage (in units/second); accepts suffix B, K, M, G (default is Bytes)", type=str, default=configuration["THRESHOLD_NIC"])
     parser.add_argument("-f", "--format", dest="format", help="output format", choices = ["json", "csv", "excel", "shell"], default="json")
     parser.add_argument("-p", "--pretty", dest="pretty", help="pretty print the output", action="store_true", default=False)
-    parser.add_argument("-l", "--level", dest="level", help="level of detail severity for the analysis", choices = ["hard", "medium", "soft"], default="soft")
+    parser.add_argument("-l", "--level", dest="level", help="level of detail severity for the analysis", choices = ["softer", "soft", "medium", "hard"], default=configuration["LEVEL"])
     parser.add_argument("--overall", dest="overall", help="how to calculate the overall value: mean, max or weighted mean", choices = ["mean", "weighted", "max"], default="mean")
     parser.add_argument("-S", "--summarize", dest="summarize", help="summarize the usage for the VMs", action="store_true", default=False)
     parser.add_argument("-U", "--under-threshold", dest="threshold_summarize", help="summary will show only VMs under this threshold of puntuation (from 0 to 10)", type=int, default=3)
@@ -146,6 +190,10 @@ def osidle_analysis():
     parser.add_argument("--dump-data", dest="dumpdata", action="store_true", default=False, help="dump the data that would be used for the analysis and finalizes")
     parser.add_argument("--info", dest="info", action="store_true", default=False, help="get the information about the data available and exit")
     parser.add_argument("--vmlist", dest="vmlist", action="store_true", default=False, help="if getting information, dump the list of available VMs")
+    parser.add_argument("--epsilon-softer", dest="epsilon_softer", help="forward-sharing epsilon for softer level (default: 0.85)", type=float, default=configuration["EPSILON_SOFTER"])
+    parser.add_argument("--epsilon-soft", dest="epsilon_soft", help="forward-sharing epsilon for soft level (default: 0.85)", type=float, default=configuration["EPSILON_SOFT"])
+    parser.add_argument("--epsilon-medium", dest="epsilon_medium", help="forward-sharing epsilon for medium level (default: 0.75)", type=float, default=configuration["EPSILON_MEDIUM"])
+    parser.add_argument("--epsilon-hard", dest="epsilon_hard", help="forward-sharing epsilon for hard level (default: 0.25)", type=float, default=configuration["EPSILON_HARD"])
     parser.add_argument('--version', action='version', version=VERSION)
 
     args = parser.parse_args()
